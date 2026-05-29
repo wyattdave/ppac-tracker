@@ -1,0 +1,44 @@
+[
+    {
+        "Product": "PowerApps",
+        "Version": "2026-06",
+        "Type":"PowerPlatform",
+        "Url": "https://releaseplans.microsoft.com/en-US/releaseplanner-json/?productId=e72f17ac-715d-e911-a968-000d3a4e32b5&langCode=en-us"
+    },
+    {
+        "Product": "PowerAutomate",
+        "Version": "2026-06",
+        "Type":"PowerPlatform",
+        "Url": "https://releaseplans.microsoft.com/en-US/releaseplanner-json/?productId=e92f17ac-715d-e911-a968-000d3a4e32b5&langCode=en-us"
+    },
+    {
+        "Product": "CopilotStudio",
+        "Version": "2026-06",
+        "Type":"PowerPlatform",
+        "Url": "https://releaseplans.microsoft.com/en-US/releaseplanner-json/?productId=1019ec3d-1dc5-e911-a969-000d3a4f36ce&langCode=en-us"
+    },
+    {
+        "Product": "AiBuilder",
+        "Version": "2026-06",
+        "Type":"PowerPlatform",
+        "Url": "https://releaseplans.microsoft.com/en-US/releaseplanner-json/?productId=eb2f17ac-715d-e911-a968-000d3a4e32b5&langCode=en-us"
+    },
+    {
+        "Product": "Dataverse",
+        "Version": "2026-06",
+        "Type":"PowerPlatform",
+        "Url": "https://releaseplans.microsoft.com/en-US/releaseplanner-json/?productId=a0e02858-50a4-ea11-a812-000d3a8faea9&langCode=en-us"
+    },
+    {
+        "Product": "Platform",
+        "Version": "2026-06",
+        "Type":"PowerPlatform",
+        "Url": "https://releaseplans.microsoft.com/en-US/releaseplanner-json/?productId=dbedfa94-1517-ea11-a811-000d3a8f010c&langCode=en-us"
+    },
+    {
+        "Product": "PowerPages",
+        "Version": "2026-06",
+        "Type":"PowerPlatform",
+        "Url": "https://releaseplans.microsoft.com/en-US/releaseplanner-json/?productId=1197f7de-0a44-ec11-8c62-00224829b77f&langCode=en-us"
+    }
+]

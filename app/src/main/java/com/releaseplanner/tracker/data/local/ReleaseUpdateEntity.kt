@@ -1,0 +1,46 @@
+package com.releaseplanner.tracker.data.local
+
+import androidx.room.Entity
+import androidx.room.PrimaryKey
+
+@Entity(tableName = "release_updates")
+data class ReleaseUpdateEntity(
+    @PrimaryKey val id: String,
+    val snapshotId: String,
+    val releasePlanId: String,
+    val productId: String,
+    val product: String,
+    val sourceProduct: String,
+    val sourceUrl: String,
+    val featureName: String,
+    val productArea: String,
+    val enabledFor: String,
+    val earlyAccessDate: String,
+    val publicPreviewDate: String,
+    val gaDate: String,
+    val releaseWaveName: String,
+    val gaReleaseWaveName: String,
+    val gitCommitDate: String,
+    val docsUrl: String,
+    val docUrl: String,
+    val docsName: String,
+    val gaDateValue: String,
+    val ppDateValue: String,
+    val eaDateValue: String,
+    val gaStatus: String,
+    val ppStatus: String,
+    val eaStatus: String,
+    val featureType: String,
+    val featureCategory: String,
+    val businessValue: String,
+    val featureDetails: String,
+    val aiContribution: Boolean,
+    val geos: List<String>,
+    val createdOn: String,
+    val firstSeenAt: Long,
+    val lastSeenAt: Long,
+    val changedAt: Long?,
+    val contentHash: String,
+    val isNew: Boolean,
+    val isChanged: Boolean,
+)

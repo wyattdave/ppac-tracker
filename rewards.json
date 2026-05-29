@@ -1,0 +1,67 @@
+[
+    {
+        "type": "read task streak",
+        "name": "7 day streak",
+        "description": "Opened a task for 7 consecutive days"
+    },
+    {
+        "type": "read task streak",
+        "name": "28 day streak",
+        "description": "Opened a task for 28 consecutive days"
+    },
+    {
+        "type": "read task streak",
+        "name": "3 month streak",
+        "description": "Opened a task for 84 consecutive days"
+    },
+    {
+        "type": "read task streak",
+        "name": "6 month streak",
+        "description": "Opened a task for 168 consecutive days"
+    },
+    {
+        "type": "read task",
+        "name": "Jukka Streak",
+        "description": "Opened a task for 364 consecutive days"
+    },
+    {
+        "type": "read task streak",
+        "name": "Niiranen Streak",
+        "description": "Opened a task for 1092 consecutive days"
+    },
+    {
+        "type": "complete task streak",
+        "name": "1 month weekly streak",
+        "description": "Complete 1 task per week for 4 consecutive weeks"
+    },
+    {
+        "type": "complete task streak",
+        "name": "3 month weekly streak",
+        "description": "Complete 1 task per week for 12 consecutive weeks"
+    },
+    {
+        "type": "complete task streak",
+        "name": "6 month weekly streak",
+        "description": "Complete 1 task per week for 26 consecutive weeks"
+    },
+    {
+        "type": "complete task streak",
+        "name": "JJ Foster weekly streak",
+        "description": "Complete 1 task per week for 52 consecutive weeks"
+    },
+    {
+        "type": "complete task ",
+        "name": "10 tasks",
+        "description": "Complete 10 tasks"
+    },
+    {
+        "type": "complete task ",
+        "name": "50 tasks",
+        "description": "Complete 50 tasks"
+    },
+    {
+        "type": "complete task ",
+        "name": "100 tasks",
+        "description": "Complete 100 tasks"
+    }
+]
