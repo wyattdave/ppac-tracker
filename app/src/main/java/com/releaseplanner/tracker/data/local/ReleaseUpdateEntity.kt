@@ -21,6 +21,7 @@ data class ReleaseUpdateEntity(
     val releaseWaveName: String,
     val gaReleaseWaveName: String,
     val gitCommitDate: String,
+    val firstGitHubPushDate: String,
     val docsUrl: String,
     val docUrl: String,
     val docsName: String,

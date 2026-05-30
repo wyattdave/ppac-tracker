@@ -19,6 +19,6 @@ interface ReleaseUpdateDao {
     @Upsert
     suspend fun upsertAll(updates: List<ReleaseUpdateEntity>)
 
-    @Query("UPDATE release_updates SET isNew = 0, isChanged = 0")
+    @Query("UPDATE release_updates SET isChanged = 0")
     suspend fun clearSyncBadges()
 }

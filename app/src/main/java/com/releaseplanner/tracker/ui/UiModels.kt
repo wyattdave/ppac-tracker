@@ -56,6 +56,7 @@ data class ReleaseTrackerUiState(
     val selectedProduct: String = "All",
     val searchQuery: String = "",
     val statusFilter: String = "Open",
+    val releaseStageFilter: String = "All Releases",
     val timelineSort: TimelineSortOption = TimelineSortOption.LastUpdate,
     val timelineDateFilter: LocalDate? = null,
     val selectedUpdate: ReleaseUpdateUi? = null,
@@ -80,7 +81,7 @@ data class ReleaseTrackerUiState(
     val todayCount: Int = todayUpdates.size
     val todayCompleteCount: Int = todayUpdates.count { it.isComplete }
     val todayOpenCount: Int = todayUpdates.count { !it.isComplete && !it.isSkipped }
-    val newCount: Int = visibleUpdates.count { it.update.isNew }
+    val newCount: Int = visibleUpdates.count { it.update.isReleasePlannerNew() }
     val changedCount: Int = visibleUpdates.count { it.update.isChanged }
     val completeCount: Int = visibleUpdates.count { it.isComplete }
     val skippedCount: Int = visibleUpdates.count { it.isSkipped }
@@ -92,11 +93,16 @@ data class ReleaseTrackerControls(
     val selectedProduct: String,
     val searchQuery: String,
     val statusFilter: String,
+    val releaseStageFilter: String,
     val timelineSort: TimelineSortOption,
     val timelineDateFilter: LocalDate?,
     val screen: AppScreen,
     val selectedUpdateId: String?,
 )
+
+fun ReleaseUpdateEntity.isReleasePlannerNew(): Boolean {
+    return firstGitHubPushDate.isBlank() || gitCommitDate.trim().equals(firstGitHubPushDate.trim(), ignoreCase = true)
+}
 
 data class ReleaseTrackerMeta(
     val isRefreshing: Boolean,

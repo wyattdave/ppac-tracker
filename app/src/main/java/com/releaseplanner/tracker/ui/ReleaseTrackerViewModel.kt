@@ -32,6 +32,7 @@ class ReleaseTrackerViewModel(application: Application) : AndroidViewModel(appli
     private val selectedProduct = MutableStateFlow("All")
     private val searchQuery = MutableStateFlow("")
     private val statusFilter = MutableStateFlow("Open")
+    private val releaseStageFilter = MutableStateFlow("All Releases")
     private val timelineSort = MutableStateFlow(TimelineSortOption.LastUpdate)
     private val timelineDateFilter = MutableStateFlow<LocalDate?>(null)
     private val currentScreen = MutableStateFlow(AppScreen.Today)
@@ -45,8 +46,9 @@ class ReleaseTrackerViewModel(application: Application) : AndroidViewModel(appli
         selectedProduct,
         searchQuery,
         statusFilter,
-    ) { product, query, status ->
-        Triple(product, query, status)
+        releaseStageFilter,
+    ) { product, query, status, releaseStage ->
+        FilterControlValues(product, query, status, releaseStage)
     }
 
     private val timelineControls = combine(
@@ -69,9 +71,10 @@ class ReleaseTrackerViewModel(application: Application) : AndroidViewModel(appli
         navigationControls,
     ) { filters, timeline, navigation ->
         ReleaseTrackerControls(
-            selectedProduct = filters.first,
-            searchQuery = filters.second,
-            statusFilter = filters.third,
+            selectedProduct = filters.product,
+            searchQuery = filters.query,
+            statusFilter = filters.status,
+            releaseStageFilter = filters.releaseStage,
             timelineSort = timeline.first,
             timelineDateFilter = timeline.second,
             screen = navigation.first,
@@ -120,9 +123,11 @@ class ReleaseTrackerViewModel(application: Application) : AndroidViewModel(appli
         }.filter { it.update.sourceProduct in enabledSources }
         val products = items.map { it.update.product }.filter { it.isNotBlank() }.distinct().sorted()
         val visible = items.filterNot { it.isHidden }
-        val filtered = visible
+        val updatesFilterSource = if (controls.statusFilter == "Hidden") items else visible
+        val filtered = updatesFilterSource
             .filter { controls.selectedProduct == "All" || it.update.product == controls.selectedProduct }
             .filter { it.matchesSearch(controls.searchQuery) }
+            .filter { it.matchesReleaseStage(controls.releaseStageFilter) }
             .filter { it.matchesStatus(controls.statusFilter) }
             .sortedWith(defaultUpdateComparator())
         val timeline = visible
@@ -146,6 +151,7 @@ class ReleaseTrackerViewModel(application: Application) : AndroidViewModel(appli
             selectedProduct = controls.selectedProduct,
             searchQuery = controls.searchQuery,
             statusFilter = controls.statusFilter,
+            releaseStageFilter = controls.releaseStageFilter,
             timelineSort = controls.timelineSort,
             timelineDateFilter = controls.timelineDateFilter,
             selectedUpdate = selected,
@@ -205,6 +211,10 @@ class ReleaseTrackerViewModel(application: Application) : AndroidViewModel(appli
         statusFilter.value = status
     }
 
+    fun setReleaseStageFilter(filter: String) {
+        releaseStageFilter.value = filter
+    }
+
     fun setTimelineSort(sort: TimelineSortOption) {
         timelineSort.value = sort
     }
@@ -218,6 +228,15 @@ class ReleaseTrackerViewModel(application: Application) : AndroidViewModel(appli
             preferences.recordTaskRead()
         }
         selectedUpdateId.value = id
+    }
+
+    fun openTaskLink(id: String) {
+        currentScreen.value = AppScreen.Updates
+        selectedProduct.value = "All"
+        searchQuery.value = ""
+        statusFilter.value = "All"
+        releaseStageFilter.value = "All Releases"
+        selectUpdate(id)
     }
 
     fun refresh() {
@@ -328,24 +347,33 @@ class ReleaseTrackerViewModel(application: Application) : AndroidViewModel(appli
         return listOf(
             update.docsName,
             update.featureDetails,
+            update.enabledFor,
+            update.productArea,
         ).any { it.lowercase().contains(normalized) }
+    }
+
+    private fun ReleaseUpdateUi.matchesReleaseStage(filter: String): Boolean {
+        return when (filter) {
+            "All Releases" -> true
+            "All Not Released" -> !update.isCurrentlyInGa()
+            "In Early Access" -> update.isCurrentlyInEarlyAccess()
+            "In Public Preview" -> update.isCurrentlyInPublicPreview()
+            "In GA" -> update.isCurrentlyInGa()
+            else -> true
+        }
     }
 
     private fun ReleaseUpdateUi.matchesStatus(status: String): Boolean {
         return when (status) {
             "All" -> true
             "Open" -> !isComplete && !isSkipped
-            "New" -> update.isNew
+            "New" -> update.isReleasePlannerNew()
             "Changed" -> update.isChanged
             "Saved" -> isSaved
             "Incomplete" -> !isComplete && !isSkipped
-            "Complete" -> isComplete
             "Skipped" -> isSkipped
-            "In Early Access" -> update.isCurrentlyInEarlyAccess()
-            "In Public Preview" -> update.isCurrentlyInPublicPreview()
-            "In GA" -> update.isCurrentlyInGa()
             "AI" -> update.aiContribution
-            "Shipped" -> update.gaStatus.equals("Shipped", ignoreCase = true)
+            "Hidden" -> isHidden
             else -> true
         }
     }
@@ -478,6 +506,13 @@ class ReleaseTrackerViewModel(application: Application) : AndroidViewModel(appli
         val updates: List<ReleaseUpdateEntity>,
         val tracking: List<UserTrackingEntity>,
         val events: List<ChangeEventEntity>,
+    )
+
+    private data class FilterControlValues(
+        val product: String,
+        val query: String,
+        val status: String,
+        val releaseStage: String,
     )
 
     private data class ReleaseTrackerPreferenceState(

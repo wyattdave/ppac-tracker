@@ -25,6 +25,7 @@ data class ReleaseItemDto(
     @SerialName("GAReleaseWaveName") val gaReleaseWaveName: String = "",
     @SerialName("Product") val product: String = "",
     @SerialName("GitCommitDate") val gitCommitDate: String = "",
+    @SerialName("FirstGitHubPushDate") val firstGitHubPushDate: String = "",
     @SerialName("DocsUrl") val docsUrl: String = "",
     @SerialName("GADateValue") val gaDateValue: String = "",
     @SerialName("EADateValue") val eaDateValue: String = "",

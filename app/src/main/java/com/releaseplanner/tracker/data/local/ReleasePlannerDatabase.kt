@@ -14,7 +14,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         UserTrackingEntity::class,
         ChangeEventEntity::class,
     ],
-    version = 2,
+    version = 3,
     exportSchema = false,
 )
 @TypeConverters(AppConverters::class)
@@ -33,7 +33,7 @@ abstract class ReleasePlannerDatabase : RoomDatabase() {
                     context.applicationContext,
                     ReleasePlannerDatabase::class.java,
                     "release_planner_tracker.db",
-                ).addMigrations(MIGRATION_1_2)
+                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                     .build()
                     .also { instance = it }
             }
@@ -43,6 +43,12 @@ abstract class ReleasePlannerDatabase : RoomDatabase() {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE user_tracking ADD COLUMN isSkipped INTEGER NOT NULL DEFAULT 0")
                 db.execSQL("ALTER TABLE release_updates ADD COLUMN earlyAccessDate TEXT NOT NULL DEFAULT ''")
+            }
+        }
+
+        private val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE release_updates ADD COLUMN firstGitHubPushDate TEXT NOT NULL DEFAULT ''")
             }
         }
     }

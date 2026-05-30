@@ -1,13 +1,16 @@
 package com.releaseplanner.tracker
 
 import android.Manifest
+import android.content.Intent
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.releaseplanner.tracker.ui.ReleaseTrackerApp
@@ -15,13 +18,25 @@ import com.releaseplanner.tracker.ui.ReleaseTrackerViewModel
 import com.releaseplanner.tracker.ui.theme.ReleasePlannerTheme
 
 class MainActivity : ComponentActivity() {
+    private val requestedTaskId = mutableStateOf<String?>(null)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         requestNotificationPermission()
+        requestedTaskId.value = intent.taskIdFromDeepLink()
         setContent {
-            ReleasePlannerRoot()
+            ReleasePlannerRoot(
+                taskId = requestedTaskId.value,
+                onTaskLinkHandled = { requestedTaskId.value = null },
+            )
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        requestedTaskId.value = intent.taskIdFromDeepLink()
     }
 
     private fun requestNotificationPermission() {
@@ -32,10 +47,20 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-private fun ReleasePlannerRoot() {
+private fun ReleasePlannerRoot(taskId: String?, onTaskLinkHandled: () -> Unit) {
     val viewModel: ReleaseTrackerViewModel = viewModel()
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+
+    LaunchedEffect(taskId) {
+        taskId?.let {
+            viewModel.openTaskLink(it)
+            onTaskLinkHandled()
+        }
+    }
+
     ReleasePlannerTheme(themeMode = state.themeMode) {
         ReleaseTrackerApp(viewModel = viewModel, state = state)
     }
 }
+
+private fun Intent.taskIdFromDeepLink(): String? = AppDeepLinks.taskIdFrom(data)

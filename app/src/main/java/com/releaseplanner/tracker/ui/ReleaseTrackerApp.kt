@@ -32,6 +32,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.blur
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.CardDefaults
@@ -60,6 +61,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -78,6 +80,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.releaseplanner.tracker.AppDeepLinks
 import com.releaseplanner.tracker.R
 import com.releaseplanner.tracker.data.ReleaseSourceSetting
 import com.releaseplanner.tracker.data.ReleaseThemeMode
@@ -94,14 +97,18 @@ private val statusFilters = listOf(
     "All",
     "New",
     "Changed",
-    "Complete",
     "Skipped",
     "Saved",
+    "AI",
+    "Hidden",
+)
+
+private val releaseStageFilters = listOf(
+    "All Releases",
+    "All Not Released",
     "In Early Access",
     "In Public Preview",
     "In GA",
-    "AI",
-    "Shipped",
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -113,8 +120,37 @@ fun ReleaseTrackerApp(viewModel: ReleaseTrackerViewModel, state: ReleaseTrackerU
     var aboutTapCount by remember { mutableStateOf(0) }
     var rewardDebugEnabled by remember { mutableStateOf(false) }
     var showAllBadges by remember { mutableStateOf(false) }
+    var achievedBadge by remember { mutableStateOf<RewardBadgeUi?>(null) }
+    var knownCompletedBadgeNames by remember { mutableStateOf<Set<String>?>(null) }
+    var updatesFilterPanelVisible by remember { mutableStateOf(false) }
+    var showUpdatesFilterButton by remember { mutableStateOf(false) }
+    var updatesResetToken by remember { mutableStateOf(0) }
 
-    BackHandler(enabled = selectedUpdate != null || showAllBadges) {
+    LaunchedEffect(state.screen, selectedUpdate, showAllBadges) {
+        if (state.screen != AppScreen.Updates || selectedUpdate != null || showAllBadges) {
+            showUpdatesFilterButton = false
+        }
+    }
+
+    LaunchedEffect(state.rewardBadges) {
+        val completedNames = state.rewardBadges.filter { it.isComplete }.map { it.name }.toSet()
+        val previousNames = knownCompletedBadgeNames
+        if (previousNames == null) {
+            knownCompletedBadgeNames = completedNames
+        } else {
+            val newNames = completedNames - previousNames
+            if (newNames.isNotEmpty()) {
+                achievedBadge = state.rewardBadges.firstOrNull { it.name in newNames }
+            }
+            knownCompletedBadgeNames = completedNames
+        }
+    }
+
+    BackHandler(enabled = achievedBadge != null) {
+        achievedBadge = null
+    }
+
+    BackHandler(enabled = achievedBadge == null && (selectedUpdate != null || showAllBadges)) {
         if (selectedUpdate != null) {
             viewModel.selectUpdate(null)
         } else {
@@ -122,130 +158,157 @@ fun ReleaseTrackerApp(viewModel: ReleaseTrackerViewModel, state: ReleaseTrackerU
         }
     }
 
-    Scaffold(
-        topBar = {
-            CenterAlignedTopAppBar(
-                title = {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("PPAC Tracker", style = MaterialTheme.typography.titleMedium)
-                        Text(state.lastSyncLabel, style = MaterialTheme.typography.labelSmall)
-                    }
-                },
-                actions = {
-                    if (selectedUpdate != null || showAllBadges) {
-                        IconButton(
-                            onClick = {
-                                if (selectedUpdate != null) {
-                                    viewModel.selectUpdate(null)
-                                } else {
-                                    showAllBadges = false
-                                }
-                            },
-                        ) {
-                            Icon(
-                                painter = painterResource(id = R.drawable.ic_arrow_back),
-                                contentDescription = "Back",
-                            )
+    Box(modifier = Modifier.fillMaxSize()) {
+        Scaffold(
+            modifier = if (achievedBadge != null) Modifier.blur(14.dp) else Modifier,
+            topBar = {
+                CenterAlignedTopAppBar(
+                    title = {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text("PPAC Tracker", style = MaterialTheme.typography.titleMedium)
+                            Text(state.lastSyncLabel, style = MaterialTheme.typography.labelSmall)
                         }
-                    }
-                },
-                navigationIcon = {
-                    Surface(
-                        modifier = Modifier
-                            .padding(start = 12.dp)
-                            .size(36.dp),
-                        shape = RoundedCornerShape(8.dp),
-                        color = MaterialTheme.colorScheme.primary,
-                    ) {
-                        Image(
-                            painter = painterResource(id = R.drawable.icon_512),
-                            contentDescription = "PPAC Tracker",
-                            modifier = Modifier.fillMaxSize(),
-                            contentScale = ContentScale.Fit,
-                        )
-                    }
-                },
-            )
-        },
-        bottomBar = {
-            NavigationBar {
-                AppScreen.entries.forEach { screen ->
-                    NavigationBarItem(
-                        selected = state.screen == screen,
-                        onClick = {
-                            showAllBadges = false
-                            viewModel.selectScreen(screen)
-                        },
-                        icon = { Icon(painterResource(id = screen.iconResId), contentDescription = screen.title) },
-                        label = { Text(screen.title) },
-                    )
-                }
-            }
-        },
-    ) { padding ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding),
-        ) {
-            Column(modifier = Modifier.fillMaxSize()) {
-                if (state.isRefreshing) {
-                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
-                }
-                state.errorMessage?.let { message ->
-                    ErrorBanner(message = message)
-                }
-                Box(modifier = Modifier.weight(1f)) {
-                    if (selectedUpdate != null) {
-                        UpdateDetailSection(
-                            item = selectedUpdate,
-                            onStatusSelected = { status -> viewModel.setTaskStatus(selectedUpdate.update.id, status) },
-                            onToggleSaved = { viewModel.toggleSaved(selectedUpdate.update.id) },
-                            onHide = {
-                                viewModel.toggleHidden(selectedUpdate.update.id)
-                                viewModel.selectUpdate(null)
-                            },
-                            onShare = { shareUpdate(context, selectedUpdate) },
-                            onOpenDocs = {
-                                selectedUpdate.update.bestDocsUrl().takeIf { it.isNotBlank() }?.let(uriHandler::openUri)
-                            },
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(16.dp),
-                        )
-                    } else if (showAllBadges) {
-                        RewardBadgesSection(
-                            badges = state.rewardBadges,
-                            rewardDebugEnabled = rewardDebugEnabled,
-                            onBadgeClick = viewModel::toggleBadgeReceived,
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(16.dp),
-                        )
-                    } else {
-                        when (state.screen) {
-                            AppScreen.Today -> TodayScreen(
-                                state = state,
-                                viewModel = viewModel,
-                                rewardDebugEnabled = rewardDebugEnabled,
-                                onSeeAllBadges = { showAllBadges = true },
-                            )
-                            AppScreen.Updates -> UpdatesScreen(state, viewModel)
-                            AppScreen.Timeline -> TimelineScreen(state, viewModel)
-                            AppScreen.Tracked -> TrackedScreen(state, viewModel)
-                            AppScreen.Settings -> SettingsScreen(
-                                state = state,
-                                viewModel = viewModel,
-                                rewardDebugEnabled = rewardDebugEnabled,
-                                onAboutTapped = {
-                                    aboutTapCount += 1
-                                    if (aboutTapCount >= 20) rewardDebugEnabled = true
+                    },
+                    actions = {
+                        if (selectedUpdate != null || showAllBadges) {
+                            IconButton(
+                                onClick = {
+                                    if (selectedUpdate != null) {
+                                        viewModel.selectUpdate(null)
+                                    } else {
+                                        showAllBadges = false
+                                    }
                                 },
+                            ) {
+                                Icon(
+                                    painter = painterResource(id = R.drawable.ic_arrow_back),
+                                    contentDescription = "Back",
+                                )
+                            }
+                        } else if (state.screen == AppScreen.Updates && showUpdatesFilterButton) {
+                            IconButton(onClick = { updatesFilterPanelVisible = true }) {
+                                Icon(
+                                    painter = painterResource(id = R.drawable.ic_filter_list),
+                                    contentDescription = "Show filters",
+                                )
+                            }
+                        }
+                    },
+                    navigationIcon = {
+                        Surface(
+                            modifier = Modifier
+                                .padding(start = 12.dp)
+                                .size(36.dp),
+                            shape = RoundedCornerShape(8.dp),
+                            color = MaterialTheme.colorScheme.primary,
+                        ) {
+                            Image(
+                                painter = painterResource(id = R.drawable.icon_512),
+                                contentDescription = "PPAC Tracker",
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = ContentScale.Fit,
                             )
+                        }
+                    },
+                )
+            },
+            bottomBar = {
+                NavigationBar {
+                    AppScreen.entries.forEach { screen ->
+                        NavigationBarItem(
+                            selected = state.screen == screen,
+                            onClick = {
+                                showAllBadges = false
+                                if (screen == AppScreen.Updates) {
+                                    updatesFilterPanelVisible = false
+                                    updatesResetToken += 1
+                                }
+                                viewModel.selectScreen(screen)
+                            },
+                            icon = { Icon(painterResource(id = screen.iconResId), contentDescription = screen.title) },
+                            label = { Text(screen.title) },
+                        )
+                    }
+                }
+            },
+        ) { padding ->
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding),
+            ) {
+                Column(modifier = Modifier.fillMaxSize()) {
+                    if (state.isRefreshing) {
+                        LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                    }
+                    state.errorMessage?.let { message ->
+                        ErrorBanner(message = message)
+                    }
+                    Box(modifier = Modifier.weight(1f)) {
+                        if (selectedUpdate != null) {
+                            UpdateDetailSection(
+                                item = selectedUpdate,
+                                onStatusSelected = { status -> viewModel.setTaskStatus(selectedUpdate.update.id, status) },
+                                onToggleSaved = { viewModel.toggleSaved(selectedUpdate.update.id) },
+                                onHide = {
+                                    viewModel.toggleHidden(selectedUpdate.update.id)
+                                    viewModel.selectUpdate(null)
+                                },
+                                onShare = { shareUpdate(context, selectedUpdate) },
+                                onOpenDocs = {
+                                    selectedUpdate.update.bestDocsUrl().takeIf { it.isNotBlank() }?.let(uriHandler::openUri)
+                                },
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(16.dp),
+                            )
+                        } else if (showAllBadges) {
+                            RewardBadgesSection(
+                                badges = state.rewardBadges,
+                                rewardDebugEnabled = rewardDebugEnabled,
+                                onBadgeClick = viewModel::toggleBadgeReceived,
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(16.dp),
+                            )
+                        } else {
+                            when (state.screen) {
+                                AppScreen.Today -> TodayScreen(
+                                    state = state,
+                                    viewModel = viewModel,
+                                    rewardDebugEnabled = rewardDebugEnabled,
+                                    onSeeAllBadges = { showAllBadges = true },
+                                )
+                                AppScreen.Updates -> UpdatesScreen(
+                                    state = state,
+                                    viewModel = viewModel,
+                                    filterPanelVisible = updatesFilterPanelVisible,
+                                    onFilterPanelVisibleChange = { updatesFilterPanelVisible = it },
+                                    onHeaderFilterVisibilityChange = { showUpdatesFilterButton = it },
+                                    resetToken = updatesResetToken,
+                                )
+                                AppScreen.Timeline -> TimelineScreen(state, viewModel)
+                                AppScreen.Tracked -> TrackedScreen(state, viewModel)
+                                AppScreen.Settings -> SettingsScreen(
+                                    state = state,
+                                    viewModel = viewModel,
+                                    rewardDebugEnabled = rewardDebugEnabled,
+                                    onAboutTapped = {
+                                        aboutTapCount += 1
+                                        if (aboutTapCount >= 20) rewardDebugEnabled = true
+                                    },
+                                )
+                            }
                         }
                     }
                 }
             }
+        }
+        achievedBadge?.let { badge ->
+            BadgeAchievementOverlay(
+                badge = badge,
+                onDismiss = { achievedBadge = null },
+            )
         }
     }
 }
@@ -289,31 +352,44 @@ private fun TodayScreen(
 }
 
 @Composable
-private fun UpdatesScreen(state: ReleaseTrackerUiState, viewModel: ReleaseTrackerViewModel) {
+private fun UpdatesScreen(
+    state: ReleaseTrackerUiState,
+    viewModel: ReleaseTrackerViewModel,
+    filterPanelVisible: Boolean,
+    onFilterPanelVisibleChange: (Boolean) -> Unit,
+    onHeaderFilterVisibilityChange: (Boolean) -> Unit,
+    resetToken: Int,
+) {
+    val listState = rememberLazyListState()
+    val controlsScrolledAway = listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 0
+
+    LaunchedEffect(resetToken) {
+        onFilterPanelVisibleChange(false)
+        listState.scrollToItem(0)
+    }
+
+    LaunchedEffect(controlsScrolledAway, filterPanelVisible) {
+        onHeaderFilterVisibilityChange(controlsScrolledAway && !filterPanelVisible)
+    }
+
     Column(modifier = Modifier.fillMaxSize()) {
-        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-                MetricCard("Today", state.todayCount.toString(), Modifier.weight(1f))
-                MetricCard("Done", state.todayCompleteCount.toString(), Modifier.weight(1f))
-                MetricCard("Complete total", state.completeCount.toString(), Modifier.weight(1f))
-            }
-            Spacer(modifier = Modifier.height(8.dp))
-            OutlinedTextField(
-                value = state.searchQuery,
-                onValueChange = viewModel::setSearchQuery,
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                label = { Text("Search updates") },
+        if (filterPanelVisible) {
+            UpdatesFilterControls(
+                state = state,
+                viewModel = viewModel,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
             )
-            Spacer(modifier = Modifier.height(8.dp))
-            ProductFilterRow(state.products, state.selectedProduct, viewModel::selectProduct)
-            Spacer(modifier = Modifier.height(8.dp))
-            StatusFilterRow(state.statusFilter, viewModel::setStatusFilter)
         }
         LazyColumn(
+            state = listState,
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
+            if (!filterPanelVisible) {
+                item(key = "updates-overview-and-filters") {
+                    UpdatesOverviewAndFilters(state = state, viewModel = viewModel)
+                }
+            }
             if (state.filteredUpdates.isEmpty()) {
                 item { EmptyState("No updates match these filters.") }
             } else {
@@ -322,6 +398,38 @@ private fun UpdatesScreen(state: ReleaseTrackerUiState, viewModel: ReleaseTracke
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun UpdatesOverviewAndFilters(state: ReleaseTrackerUiState, viewModel: ReleaseTrackerViewModel) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+            MetricCard("Today", state.todayCount.toString(), Modifier.weight(1f))
+            MetricCard("Done", state.todayCompleteCount.toString(), Modifier.weight(1f))
+            MetricCard("Complete total", state.completeCount.toString(), Modifier.weight(1f))
+        }
+        UpdatesFilterControls(state = state, viewModel = viewModel)
+    }
+}
+
+@Composable
+private fun UpdatesFilterControls(
+    state: ReleaseTrackerUiState,
+    viewModel: ReleaseTrackerViewModel,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        OutlinedTextField(
+            value = state.searchQuery,
+            onValueChange = viewModel::setSearchQuery,
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            label = { Text("Search updates") },
+        )
+        ProductFilterRow(state.products, state.selectedProduct, viewModel::selectProduct)
+        ReleaseStageFilterRow(state.releaseStageFilter, viewModel::setReleaseStageFilter)
+        StatusFilterRow(state.statusFilter, viewModel::setStatusFilter)
     }
 }
 
@@ -494,7 +602,7 @@ private fun SettingsScreen(
             }
         }
         OutlinedButton(onClick = viewModel::clearBadges) {
-            Text("Clear new and changed badges")
+            Text("Clear changed badges")
         }
         AboutCard(
             onTapped = onAboutTapped,
@@ -868,6 +976,43 @@ private fun BadgeImage(badge: RewardBadgeUi, modifier: Modifier = Modifier) {
 }
 
 @Composable
+private fun BadgeAchievementOverlay(
+    badge: RewardBadgeUi,
+    onDismiss: () -> Unit,
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxSize()
+            .clickable(onClick = onDismiss),
+        color = MaterialTheme.colorScheme.scrim.copy(alpha = 0.45f),
+    ) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center,
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(18.dp),
+            ) {
+                BadgeImage(
+                    badge = badge,
+                    modifier = Modifier.fillMaxWidth(0.75f),
+                )
+                Text(
+                    text = "You achieved ${badge.name} for ${badge.description}",
+                    color = Color.White,
+                    style = MaterialTheme.typography.titleMedium,
+                    textAlign = TextAlign.Center,
+                )
+            }
+        }
+    }
+}
+
+@Composable
 private fun ProductSettingsCard(
     settings: List<ReleaseSourceSetting>,
     onToggle: (String, Boolean) -> Unit,
@@ -971,7 +1116,7 @@ private fun ReleaseUpdateRow(item: ReleaseUpdateUi, onClick: () -> Unit) {
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 StatusPill(item.update.statusLabel())
-                if (item.update.isNew) StatusPill("New")
+                if (item.update.isReleasePlannerNew()) StatusPill("New")
                 if (item.update.isChanged) StatusPill("Changed")
                 if (item.isComplete) StatusPill("Complete")
                 if (item.isSkipped) StatusPill("Skipped")
@@ -1036,6 +1181,9 @@ private fun UpdateDetailSection(
             }
             DetailLine("Area", item.update.productArea)
             DetailLine("Date", item.update.primaryDateLabel())
+            DetailLine("EarlyAccessDate", item.update.earlyAccessDate.ifBlank { "-" })
+            DetailLine("PublicPreviewDate", item.update.publicPreviewDate.ifBlank { "-" })
+            DetailLine("GADate", item.update.gaDate.ifBlank { "-" })
             DetailLine("Enabled for", item.update.enabledFor)
             DetailLine("Wave", item.update.gaReleaseWaveName.ifBlank { item.update.releaseWaveName })
             SectionTitle("Business value")
@@ -1267,6 +1415,24 @@ private fun StatusFilterRow(selected: String, onSelected: (String) -> Unit) {
 }
 
 @Composable
+private fun ReleaseStageFilterRow(selected: String, onSelected: (String) -> Unit) {
+    Row(
+        modifier = Modifier
+            .horizontalScroll(rememberScrollState())
+            .fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        releaseStageFilters.forEach { filter ->
+            FilterChip(
+                selected = selected == filter,
+                onClick = { onSelected(filter) },
+                label = { Text(filter) },
+            )
+        }
+    }
+}
+
+@Composable
 private fun MetricCard(label: String, value: String, modifier: Modifier = Modifier) {
     ElevatedCard(modifier = modifier.height(96.dp)) {
         Column(
@@ -1344,6 +1510,7 @@ private fun shareUpdate(context: Context, item: ReleaseUpdateUi) {
         appendLine()
         appendLine("Status: ${update.statusLabel()}")
         appendLine("Date: ${update.primaryDateLabel()}")
+        appendLine("Open in PPAC Tracker: ${AppDeepLinks.taskUri(update.id)}")
         update.bestDocsUrl().takeIf { it.isNotBlank() }?.let { appendLine("Docs: $it") }
     }
     val intent = Intent(Intent.ACTION_SEND).apply {

@@ -31,6 +31,7 @@ fun ReleaseItemDto.toEntity(
         releaseWaveName = releaseWaveName,
         gaReleaseWaveName = gaReleaseWaveName,
         gitCommitDate = gitCommitDate,
+        firstGitHubPushDate = firstGitHubPushDate,
         docsUrl = docsUrl,
         docUrl = docUrl,
         docsName = docsName,
@@ -51,9 +52,13 @@ fun ReleaseItemDto.toEntity(
         lastSeenAt = now,
         changedAt = if (contentChanged) now else existing?.changedAt,
         contentHash = hash,
-        isNew = existing?.isNew ?: true,
+        isNew = isNewFromReleasePlannerDates(),
         isChanged = contentChanged || (existing?.isChanged ?: false),
     )
+}
+
+private fun ReleaseItemDto.isNewFromReleasePlannerDates(): Boolean {
+    return firstGitHubPushDate.isBlank() || gitCommitDate.trim().equals(firstGitHubPushDate.trim(), ignoreCase = true)
 }
 
 private fun ReleaseItemDto.contentHash(source: ReleaseSource): String {
@@ -71,6 +76,7 @@ private fun ReleaseItemDto.contentHash(source: ReleaseSource): String {
         ppStatus,
         eaStatus,
         gitCommitDate,
+        firstGitHubPushDate,
         docsUrl,
         docUrl,
         businessValue,
