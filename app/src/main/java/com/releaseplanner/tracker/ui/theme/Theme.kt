@@ -8,7 +8,7 @@ import androidx.compose.ui.graphics.Color
 import com.releaseplanner.tracker.data.ReleaseThemeMode
 
 private val LightColors = lightColorScheme(
-    primary = Color(0xFF2563EB),
+    primary = Color(0xFF072647),
     onPrimary = Color.White,
     secondary = Color(0xFF0F766E),
     tertiary = Color(0xFF9333EA),
@@ -19,9 +19,12 @@ private val LightColors = lightColorScheme(
 )
 
 private val DarkColors = darkColorScheme(
-    primary = Color(0xFF93C5FD),
+    primary = Color(0xFF207695),
+    onPrimary = Color.White,
     secondary = Color(0xFF5EEAD4),
+    onSecondary = Color.White,
     tertiary = Color(0xFFD8B4FE),
+    onTertiary = Color.White,
 )
 
 @Composable

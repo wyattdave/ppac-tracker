@@ -25,6 +25,12 @@ enum class TimelineSortOption(val label: String) {
     GeneralAvailability("GA"),
 }
 
+enum class TaskStatus(val label: String) {
+    Open("Open"),
+    Complete("Complete"),
+    Skipped("Skipped"),
+}
+
 data class ReleaseUpdateUi(
     val update: ReleaseUpdateEntity,
     val tracking: UserTrackingEntity,
@@ -33,6 +39,12 @@ data class ReleaseUpdateUi(
     val isSkipped: Boolean get() = tracking.isSkipped
     val isSaved: Boolean get() = tracking.isSaved
     val isHidden: Boolean get() = tracking.isHidden
+    val taskStatus: TaskStatus
+        get() = when {
+            isComplete -> TaskStatus.Complete
+            isSkipped -> TaskStatus.Skipped
+            else -> TaskStatus.Open
+        }
 }
 
 data class ReleaseTrackerUiState(
@@ -52,6 +64,11 @@ data class ReleaseTrackerUiState(
     val themeMode: ReleaseThemeMode = ReleaseThemeMode.Light,
     val rewardProgress: List<RewardProgressUi> = emptyList(),
     val rewardBadges: List<RewardBadgeUi> = emptyList(),
+    val readStreakDays: Int = 0,
+    val completeStreakWeeks: Int = 0,
+    val longestReadStreakDays: Int = 0,
+    val longestCompleteStreakWeeks: Int = 0,
+    val rewardCompletedTaskCount: Int = 0,
     val isRefreshing: Boolean = false,
     val isDebugLoading: Boolean = false,
     val errorMessage: String? = null,

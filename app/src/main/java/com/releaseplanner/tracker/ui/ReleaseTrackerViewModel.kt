@@ -135,6 +135,7 @@ class ReleaseTrackerViewModel(application: Application) : AndroidViewModel(appli
             .sortedWith(timelineComparator(controls.timelineSort))
         val selected = items.firstOrNull { it.update.id == controls.selectedUpdateId }
         val lastSeenAt = data.updates.maxOfOrNull { it.lastSeenAt }
+        val completedTaskCount = preferenceState.rewardPerformance.completedTaskOverride ?: items.count { it.isComplete }
 
         ReleaseTrackerUiState(
             screen = controls.screen,
@@ -151,8 +152,13 @@ class ReleaseTrackerViewModel(application: Application) : AndroidViewModel(appli
             recentEvents = data.events,
             sourceSettings = preferenceState.sourceSettings,
             themeMode = preferenceState.themeMode,
-            rewardProgress = rewards.toRewardProgress(preferenceState.rewardPerformance, items.count { it.isComplete }),
-            rewardBadges = rewards.toRewardBadges(preferenceState.rewardPerformance, items.count { it.isComplete }),
+            rewardProgress = rewards.toRewardProgress(preferenceState.rewardPerformance, completedTaskCount),
+            rewardBadges = rewards.toRewardBadges(preferenceState.rewardPerformance, completedTaskCount),
+            readStreakDays = preferenceState.rewardPerformance.readStreakDays,
+            completeStreakWeeks = preferenceState.rewardPerformance.completeStreakWeeks,
+            longestReadStreakDays = preferenceState.rewardPerformance.longestReadStreakDays,
+            longestCompleteStreakWeeks = preferenceState.rewardPerformance.longestCompleteStreakWeeks,
+            rewardCompletedTaskCount = completedTaskCount,
             isRefreshing = meta.isRefreshing,
             isDebugLoading = meta.isDebugLoading,
             errorMessage = meta.errorMessage,
@@ -173,6 +179,7 @@ class ReleaseTrackerViewModel(application: Application) : AndroidViewModel(appli
 
     fun selectScreen(screen: AppScreen) {
         currentScreen.value = screen
+        selectedUpdateId.value = null
     }
 
     fun selectProduct(product: String) {
@@ -267,6 +274,30 @@ class ReleaseTrackerViewModel(application: Application) : AndroidViewModel(appli
         }
     }
 
+    fun setTaskStatus(id: String, status: TaskStatus) {
+        viewModelScope.launch {
+            val wasComplete = uiState.value.updates.firstOrNull { it.update.id == id }?.isComplete == true
+            repository.updateTracking(id) { tracking ->
+                when (status) {
+                    TaskStatus.Open -> tracking.copy(isComplete = false, isSkipped = false)
+                    TaskStatus.Complete -> tracking.copy(isComplete = true, isSkipped = false)
+                    TaskStatus.Skipped -> tracking.copy(isComplete = false, isSkipped = true)
+                }
+            }
+            if (status == TaskStatus.Complete && !wasComplete) {
+                preferences.recordTaskCompleted()
+            }
+        }
+    }
+
+    fun setDebugRewardState(readStreakDays: Int, completeStreakWeeks: Int, completedTaskCount: Int) {
+        preferences.setDebugRewardState(readStreakDays, completeStreakWeeks, completedTaskCount)
+    }
+
+    fun toggleBadgeReceived(name: String, isCurrentlyComplete: Boolean) {
+        preferences.toggleManualBadge(name, isCurrentlyComplete)
+    }
+
     fun toggleSkipped(id: String) {
         viewModelScope.launch {
             repository.updateTracking(id) { tracking ->
@@ -295,12 +326,8 @@ class ReleaseTrackerViewModel(application: Application) : AndroidViewModel(appli
         val normalized = query.trim().lowercase()
         if (normalized.isBlank()) return true
         return listOf(
-            update.featureName,
-            update.product,
-            update.productArea,
-            update.featureType,
-            update.featureCategory,
             update.docsName,
+            update.featureDetails,
         ).any { it.lowercase().contains(normalized) }
     }
 
@@ -401,7 +428,11 @@ class ReleaseTrackerViewModel(application: Application) : AndroidViewModel(appli
                 current = current,
                 target = target.target,
                 unit = target.kind.unit,
-                isComplete = current >= target.target,
+                isComplete = when {
+                    performance.manuallyCompletedBadges.contains(target.name) -> true
+                    performance.manuallyOpenBadges.contains(target.name) -> false
+                    else -> current >= target.target
+                },
             )
         }
     }

@@ -3,6 +3,7 @@ package com.releaseplanner.tracker.ui
 import android.content.Context
 import android.content.Intent
 import android.graphics.BitmapFactory
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
@@ -38,6 +39,8 @@ import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -54,6 +57,7 @@ import androidx.compose.material3.Text
 import androidx.compose.ui.res.painterResource
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -74,7 +78,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
 import com.releaseplanner.tracker.R
 import com.releaseplanner.tracker.data.ReleaseSourceSetting
 import com.releaseplanner.tracker.data.ReleaseThemeMode
@@ -106,6 +109,18 @@ private val statusFilters = listOf(
 fun ReleaseTrackerApp(viewModel: ReleaseTrackerViewModel, state: ReleaseTrackerUiState) {
     val context = LocalContext.current
     val uriHandler = LocalUriHandler.current
+    val selectedUpdate = state.selectedUpdate
+    var aboutTapCount by remember { mutableStateOf(0) }
+    var rewardDebugEnabled by remember { mutableStateOf(false) }
+    var showAllBadges by remember { mutableStateOf(false) }
+
+    BackHandler(enabled = selectedUpdate != null || showAllBadges) {
+        if (selectedUpdate != null) {
+            viewModel.selectUpdate(null)
+        } else {
+            showAllBadges = false
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -116,18 +131,37 @@ fun ReleaseTrackerApp(viewModel: ReleaseTrackerViewModel, state: ReleaseTrackerU
                         Text(state.lastSyncLabel, style = MaterialTheme.typography.labelSmall)
                     }
                 },
+                actions = {
+                    if (selectedUpdate != null || showAllBadges) {
+                        IconButton(
+                            onClick = {
+                                if (selectedUpdate != null) {
+                                    viewModel.selectUpdate(null)
+                                } else {
+                                    showAllBadges = false
+                                }
+                            },
+                        ) {
+                            Icon(
+                                painter = painterResource(id = R.drawable.ic_arrow_back),
+                                contentDescription = "Back",
+                            )
+                        }
+                    }
+                },
                 navigationIcon = {
                     Surface(
                         modifier = Modifier
                             .padding(start = 12.dp)
                             .size(36.dp),
-                        shape = CircleShape,
-                        color = Color(0xFF0F4FD6),
+                        shape = RoundedCornerShape(8.dp),
+                        color = MaterialTheme.colorScheme.primary,
                     ) {
                         Image(
-                            painter = painterResource(id = R.drawable.ic_launcher_foreground_wireframe),
+                            painter = painterResource(id = R.drawable.icon_512),
                             contentDescription = "PPAC Tracker",
-                            modifier = Modifier.padding(5.dp),
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Fit,
                         )
                     }
                 },
@@ -138,7 +172,10 @@ fun ReleaseTrackerApp(viewModel: ReleaseTrackerViewModel, state: ReleaseTrackerU
                 AppScreen.entries.forEach { screen ->
                     NavigationBarItem(
                         selected = state.screen == screen,
-                        onClick = { viewModel.selectScreen(screen) },
+                        onClick = {
+                            showAllBadges = false
+                            viewModel.selectScreen(screen)
+                        },
                         icon = { Icon(painterResource(id = screen.iconResId), contentDescription = screen.title) },
                         label = { Text(screen.title) },
                     )
@@ -158,39 +195,68 @@ fun ReleaseTrackerApp(viewModel: ReleaseTrackerViewModel, state: ReleaseTrackerU
                 state.errorMessage?.let { message ->
                     ErrorBanner(message = message)
                 }
-                when (state.screen) {
-                    AppScreen.Today -> TodayScreen(state, viewModel)
-                    AppScreen.Updates -> UpdatesScreen(state, viewModel)
-                    AppScreen.Timeline -> TimelineScreen(state, viewModel)
-                    AppScreen.Tracked -> TrackedScreen(state, viewModel)
-                    AppScreen.Settings -> SettingsScreen(state, viewModel)
+                Box(modifier = Modifier.weight(1f)) {
+                    if (selectedUpdate != null) {
+                        UpdateDetailSection(
+                            item = selectedUpdate,
+                            onStatusSelected = { status -> viewModel.setTaskStatus(selectedUpdate.update.id, status) },
+                            onToggleSaved = { viewModel.toggleSaved(selectedUpdate.update.id) },
+                            onHide = {
+                                viewModel.toggleHidden(selectedUpdate.update.id)
+                                viewModel.selectUpdate(null)
+                            },
+                            onShare = { shareUpdate(context, selectedUpdate) },
+                            onOpenDocs = {
+                                selectedUpdate.update.bestDocsUrl().takeIf { it.isNotBlank() }?.let(uriHandler::openUri)
+                            },
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(16.dp),
+                        )
+                    } else if (showAllBadges) {
+                        RewardBadgesSection(
+                            badges = state.rewardBadges,
+                            rewardDebugEnabled = rewardDebugEnabled,
+                            onBadgeClick = viewModel::toggleBadgeReceived,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(16.dp),
+                        )
+                    } else {
+                        when (state.screen) {
+                            AppScreen.Today -> TodayScreen(
+                                state = state,
+                                viewModel = viewModel,
+                                rewardDebugEnabled = rewardDebugEnabled,
+                                onSeeAllBadges = { showAllBadges = true },
+                            )
+                            AppScreen.Updates -> UpdatesScreen(state, viewModel)
+                            AppScreen.Timeline -> TimelineScreen(state, viewModel)
+                            AppScreen.Tracked -> TrackedScreen(state, viewModel)
+                            AppScreen.Settings -> SettingsScreen(
+                                state = state,
+                                viewModel = viewModel,
+                                rewardDebugEnabled = rewardDebugEnabled,
+                                onAboutTapped = {
+                                    aboutTapCount += 1
+                                    if (aboutTapCount >= 20) rewardDebugEnabled = true
+                                },
+                            )
+                        }
+                    }
                 }
             }
         }
     }
-
-    state.selectedUpdate?.let { item ->
-        UpdateDetailDialog(
-            item = item,
-            onDismiss = { viewModel.selectUpdate(null) },
-            onToggleComplete = { viewModel.toggleComplete(item.update.id) },
-            onToggleSkipped = { viewModel.toggleSkipped(item.update.id) },
-            onToggleSaved = { viewModel.toggleSaved(item.update.id) },
-            onHide = {
-                viewModel.toggleHidden(item.update.id)
-                viewModel.selectUpdate(null)
-            },
-            onShare = { shareUpdate(context, item) },
-            onOpenDocs = {
-                item.update.bestDocsUrl().takeIf { it.isNotBlank() }?.let(uriHandler::openUri)
-            },
-        )
-    }
 }
 
 @Composable
-private fun TodayScreen(state: ReleaseTrackerUiState, viewModel: ReleaseTrackerViewModel) {
-    var showAllBadges by remember { mutableStateOf(false) }
+private fun TodayScreen(
+    state: ReleaseTrackerUiState,
+    viewModel: ReleaseTrackerViewModel,
+    rewardDebugEnabled: Boolean,
+    onSeeAllBadges: () -> Unit,
+) {
     val today = state.todayUpdates
         .sortedWith(compareBy<ReleaseUpdateUi> { it.isComplete || it.isSkipped }.thenBy { it.update.featureName.lowercase() })
 
@@ -198,15 +264,8 @@ private fun TodayScreen(state: ReleaseTrackerUiState, viewModel: ReleaseTrackerV
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        item {
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-                MetricCard("Today", state.todayCount.toString(), Modifier.weight(1f))
-                MetricCard("Done", state.todayCompleteCount.toString(), Modifier.weight(1f))
-                MetricCard("Open", state.todayOpenCount.toString(), Modifier.weight(1f))
-            }
-        }
         if (state.rewardProgress.isNotEmpty()) {
-            item { RewardProgressSection(state.rewardProgress) }
+            item { RewardProgressSection(state) }
         }
         item { SectionTitle("Today's updates") }
         if (today.isEmpty()) {
@@ -217,15 +276,15 @@ private fun TodayScreen(state: ReleaseTrackerUiState, viewModel: ReleaseTrackerV
             }
         }
         if (state.rewardBadges.isNotEmpty()) {
-            item { CompletedBadgesSection(state.rewardBadges, onSeeAll = { showAllBadges = true }) }
+            item {
+                CompletedBadgesSection(
+                    badges = state.rewardBadges,
+                    rewardDebugEnabled = rewardDebugEnabled,
+                    onSeeAll = onSeeAllBadges,
+                    onBadgeClick = viewModel::toggleBadgeReceived,
+                )
+            }
         }
-    }
-
-    if (showAllBadges) {
-        RewardBadgesDialog(
-            badges = state.rewardBadges,
-            onDismiss = { showAllBadges = false },
-        )
     }
 }
 
@@ -233,6 +292,12 @@ private fun TodayScreen(state: ReleaseTrackerUiState, viewModel: ReleaseTrackerV
 private fun UpdatesScreen(state: ReleaseTrackerUiState, viewModel: ReleaseTrackerViewModel) {
     Column(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+                MetricCard("Today", state.todayCount.toString(), Modifier.weight(1f))
+                MetricCard("Done", state.todayCompleteCount.toString(), Modifier.weight(1f))
+                MetricCard("Complete total", state.completeCount.toString(), Modifier.weight(1f))
+            }
+            Spacer(modifier = Modifier.height(8.dp))
             OutlinedTextField(
                 value = state.searchQuery,
                 onValueChange = viewModel::setSearchQuery,
@@ -358,7 +423,14 @@ private fun TrackedScreen(state: ReleaseTrackerUiState, viewModel: ReleaseTracke
 }
 
 @Composable
-private fun SettingsScreen(state: ReleaseTrackerUiState, viewModel: ReleaseTrackerViewModel) {
+private fun SettingsScreen(
+    state: ReleaseTrackerUiState,
+    viewModel: ReleaseTrackerViewModel,
+    rewardDebugEnabled: Boolean,
+    onAboutTapped: () -> Unit,
+) {
+    val uriHandler = LocalUriHandler.current
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -424,11 +496,27 @@ private fun SettingsScreen(state: ReleaseTrackerUiState, viewModel: ReleaseTrack
         OutlinedButton(onClick = viewModel::clearBadges) {
             Text("Clear new and changed badges")
         }
+        AboutCard(
+            onTapped = onAboutTapped,
+            onOpenWyattDave = { uriHandler.openUri("https://wyattdave.com") },
+            onOpenPowerDevBox = { uriHandler.openUri("https://powerdevbox.com") },
+        )
+        if (rewardDebugEnabled) {
+            RewardDebugCard(
+                state = state,
+                onApply = viewModel::setDebugRewardState,
+            )
+        }
     }
 }
 
 @Composable
-private fun CompletedBadgesSection(badges: List<RewardBadgeUi>, onSeeAll: () -> Unit) {
+private fun CompletedBadgesSection(
+    badges: List<RewardBadgeUi>,
+    rewardDebugEnabled: Boolean,
+    onSeeAll: () -> Unit,
+    onBadgeClick: (String, Boolean) -> Unit,
+) {
     val completedBadges = badges.filter { it.isComplete }
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -436,16 +524,30 @@ private fun CompletedBadgesSection(badges: List<RewardBadgeUi>, onSeeAll: () -> 
         if (completedBadges.isEmpty()) {
             EmptyState("No badges earned yet.")
         } else {
-            CompletedBadgeCarousel(completedBadges)
+            CompletedBadgeCarousel(
+                badges = completedBadges,
+                rewardDebugEnabled = rewardDebugEnabled,
+                onBadgeClick = onBadgeClick,
+            )
         }
-        Button(onClick = onSeeAll, modifier = Modifier.fillMaxWidth()) {
-            Text("See all")
-        }
+        Text(
+            text = "See all",
+            modifier = Modifier
+                .align(Alignment.End)
+                .clickable(onClick = onSeeAll)
+                .padding(horizontal = 8.dp, vertical = 6.dp),
+            color = MaterialTheme.colorScheme.primary,
+            style = MaterialTheme.typography.labelLarge,
+        )
     }
 }
 
 @Composable
-private fun CompletedBadgeCarousel(badges: List<RewardBadgeUi>) {
+private fun CompletedBadgeCarousel(
+    badges: List<RewardBadgeUi>,
+    rewardDebugEnabled: Boolean,
+    onBadgeClick: (String, Boolean) -> Unit,
+) {
     BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
         val badgeWidth = (maxWidth - 20.dp) / 3
         Row(
@@ -457,6 +559,8 @@ private fun CompletedBadgeCarousel(badges: List<RewardBadgeUi>) {
             badges.forEach { badge ->
                 BadgeTile(
                     badge = badge,
+                    rewardDebugEnabled = rewardDebugEnabled,
+                    onBadgeClick = onBadgeClick,
                     modifier = Modifier.width(badgeWidth),
                 )
             }
@@ -465,8 +569,17 @@ private fun CompletedBadgeCarousel(badges: List<RewardBadgeUi>) {
 }
 
 @Composable
-private fun BadgeTile(badge: RewardBadgeUi, modifier: Modifier = Modifier) {
-    ElevatedCard(modifier = modifier.aspectRatio(1f)) {
+private fun BadgeTile(
+    badge: RewardBadgeUi,
+    rewardDebugEnabled: Boolean,
+    onBadgeClick: (String, Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    ElevatedCard(
+        modifier = modifier
+            .aspectRatio(1f)
+            .then(if (rewardDebugEnabled) Modifier.clickable { onBadgeClick(badge.name, badge.isComplete) } else Modifier),
+    ) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -482,10 +595,19 @@ private fun BadgeTile(badge: RewardBadgeUi, modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun RewardProgressSection(progress: List<RewardProgressUi>) {
+private fun RewardProgressSection(state: ReleaseTrackerUiState) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         SectionTitle("Rewards")
-        RewardProgressCard(progress)
+        RewardProgressCard(state.rewardProgress)
+        LongestRewardStats(state.longestReadStreakDays, state.longestCompleteStreakWeeks)
+    }
+}
+
+@Composable
+private fun LongestRewardStats(longestReadStreakDays: Int, longestCompleteStreakWeeks: Int) {
+    Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+        MetricCard("Longest streak", "$longestReadStreakDays days", Modifier.weight(1f))
+        MetricCard("Longest complete", "$longestCompleteStreakWeeks weeks", Modifier.weight(1f))
     }
 }
 
@@ -547,30 +669,35 @@ private fun RewardProgressCard(progress: List<RewardProgressUi>) {
 }
 
 @Composable
-private fun RewardBadgesDialog(badges: List<RewardBadgeUi>, onDismiss: () -> Unit) {
-    Dialog(onDismissRequest = onDismiss) {
-        Surface(
-            shape = RoundedCornerShape(8.dp),
-            tonalElevation = 6.dp,
+private fun RewardBadgesSection(
+    badges: List<RewardBadgeUi>,
+    rewardDebugEnabled: Boolean,
+    onBadgeClick: (String, Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        shape = RoundedCornerShape(8.dp),
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary),
+        modifier = modifier,
+    ) {
+        Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(max = 720.dp),
+                .fillMaxSize()
+                .padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Column(
-                modifier = Modifier.padding(18.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+            Text("Badges", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+            LazyColumn(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                Text("Badges", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                LazyColumn(
-                    modifier = Modifier.heightIn(max = 560.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
-                    items(badges, key = { it.name }) { badge ->
-                        BadgeListRow(badge)
-                    }
-                }
-                TextButton(onClick = onDismiss, modifier = Modifier.align(Alignment.End)) {
-                    Text("Close")
+                items(badges, key = { it.name }) { badge ->
+                    BadgeListRow(
+                        badge = badge,
+                        rewardDebugEnabled = rewardDebugEnabled,
+                        onBadgeClick = onBadgeClick,
+                    )
                 }
             }
         }
@@ -578,9 +705,15 @@ private fun RewardBadgesDialog(badges: List<RewardBadgeUi>, onDismiss: () -> Uni
 }
 
 @Composable
-private fun BadgeListRow(badge: RewardBadgeUi) {
+private fun BadgeListRow(
+    badge: RewardBadgeUi,
+    rewardDebugEnabled: Boolean,
+    onBadgeClick: (String, Boolean) -> Unit,
+) {
     Surface(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(if (rewardDebugEnabled) Modifier.clickable { onBadgeClick(badge.name, badge.isComplete) } else Modifier),
         shape = RoundedCornerShape(8.dp),
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if (badge.isComplete) 0.6f else 0.32f),
     ) {
@@ -604,6 +737,94 @@ private fun BadgeListRow(badge: RewardBadgeUi) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun AboutCard(
+    onTapped: () -> Unit,
+    onOpenWyattDave: () -> Unit,
+    onOpenPowerDevBox: () -> Unit,
+) {
+    ElevatedCard(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onTapped),
+    ) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("About", style = MaterialTheme.typography.titleMedium)
+            Text("Created by David Wyatt, Published by Power DevBox. For more information visit:")
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                LinkListItem("https://wyattdave.com", onOpenWyattDave)
+                LinkListItem("https://powerdevbox.com", onOpenPowerDevBox)
+            }
+        }
+    }
+}
+
+@Composable
+private fun LinkListItem(text: String, onClick: () -> Unit) {
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Top) {
+        Text("-", style = MaterialTheme.typography.bodyMedium)
+        Text(
+            text = text,
+            modifier = Modifier.clickable(onClick = onClick),
+            color = MaterialTheme.colorScheme.primary,
+            style = MaterialTheme.typography.bodyMedium,
+        )
+    }
+}
+
+@Composable
+private fun RewardDebugCard(
+    state: ReleaseTrackerUiState,
+    onApply: (Int, Int, Int) -> Unit,
+) {
+    var readStreakDays by remember { mutableStateOf(state.readStreakDays.toString()) }
+    var completeStreakWeeks by remember { mutableStateOf(state.completeStreakWeeks.toString()) }
+    var completedTaskCount by remember { mutableStateOf(state.rewardCompletedTaskCount.toString()) }
+
+    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text("Debug rewards", style = MaterialTheme.typography.titleMedium)
+            OutlinedTextField(
+                value = readStreakDays,
+                onValueChange = { readStreakDays = it.filter(Char::isDigit) },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                label = { Text("Days read streak") },
+            )
+            OutlinedTextField(
+                value = completeStreakWeeks,
+                onValueChange = { completeStreakWeeks = it.filter(Char::isDigit) },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                label = { Text("Weeks complete streak") },
+            )
+            OutlinedTextField(
+                value = completedTaskCount,
+                onValueChange = { completedTaskCount = it.filter(Char::isDigit) },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                label = { Text("Total complete") },
+            )
+            Button(
+                onClick = {
+                    onApply(
+                        readStreakDays.toIntOrNull() ?: 0,
+                        completeStreakWeeks.toIntOrNull() ?: 0,
+                        completedTaskCount.toIntOrNull() ?: 0,
+                    )
+                },
+            ) {
+                Text("Apply debug values")
+            }
+            Text(
+                text = "Badge tapping is enabled until the app restarts.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }
@@ -780,65 +1001,88 @@ private fun TimelineRow(item: ReleaseUpdateUi, sort: TimelineSortOption, onClick
 }
 
 @Composable
-private fun UpdateDetailDialog(
+private fun UpdateDetailSection(
     item: ReleaseUpdateUi,
-    onDismiss: () -> Unit,
-    onToggleComplete: () -> Unit,
-    onToggleSkipped: () -> Unit,
+    onStatusSelected: (TaskStatus) -> Unit,
     onToggleSaved: () -> Unit,
     onHide: () -> Unit,
     onShare: () -> Unit,
     onOpenDocs: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
-    Dialog(onDismissRequest = onDismiss) {
-        Surface(
-            shape = RoundedCornerShape(8.dp),
-            tonalElevation = 6.dp,
+    Surface(
+        shape = RoundedCornerShape(8.dp),
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary),
+        modifier = modifier,
+    ) {
+        Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(max = 720.dp),
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Column(
-                modifier = Modifier
-                    .verticalScroll(rememberScrollState())
-                    .padding(18.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+            Text(item.update.product, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelLarge)
+            Text(item.update.featureName, style = MaterialTheme.typography.headlineSmall)
+            Row(
+                modifier = Modifier.horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Text(item.update.product, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelLarge)
-                Text(item.update.featureName, style = MaterialTheme.typography.headlineSmall)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    StatusPill(item.update.statusLabel())
-                    if (item.update.aiContribution) StatusPill("AI")
-                    if (item.isComplete) StatusPill("Complete")
-                    if (item.isSkipped) StatusPill("Skipped")
+                StatusPill(item.update.statusLabel())
+                if (item.update.aiContribution) StatusPill("AI")
+                if (item.isComplete) StatusPill("Complete")
+                if (item.isSkipped) StatusPill("Skipped")
+            }
+            DetailLine("Area", item.update.productArea)
+            DetailLine("Date", item.update.primaryDateLabel())
+            DetailLine("Enabled for", item.update.enabledFor)
+            DetailLine("Wave", item.update.gaReleaseWaveName.ifBlank { item.update.releaseWaveName })
+            SectionTitle("Business value")
+            Text(item.update.businessValue.htmlToText().ifBlank { "No summary provided." })
+            SectionTitle("Details")
+            Text(item.update.featureDetails.htmlToText().ifBlank { "No details provided." })
+            TaskStatusDropdown(selected = item.taskStatus, onSelected = onStatusSelected)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                OutlinedButton(onClick = onToggleSaved, modifier = Modifier.weight(1f)) {
+                    Text(if (item.isSaved) "Unsave" else "Save")
                 }
-                DetailLine("Area", item.update.productArea)
-                DetailLine("Date", item.update.primaryDateLabel())
-                DetailLine("Enabled for", item.update.enabledFor)
-                DetailLine("Wave", item.update.gaReleaseWaveName.ifBlank { item.update.releaseWaveName })
-                SectionTitle("Business value")
-                Text(item.update.businessValue.htmlToText().ifBlank { "No summary provided." })
-                SectionTitle("Details")
-                Text(item.update.featureDetails.htmlToText().ifBlank { "No details provided." })
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                    Button(onClick = onToggleComplete, modifier = Modifier.weight(1f)) {
-                        Text(if (item.isComplete) "Mark open" else "Complete")
-                    }
-                    OutlinedButton(onClick = onToggleSkipped, modifier = Modifier.weight(1f)) {
-                        Text(if (item.isSkipped) "Mark open" else "Skip")
-                    }
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                    OutlinedButton(onClick = onToggleSaved, modifier = Modifier.weight(1f)) {
-                        Text(if (item.isSaved) "Unsave" else "Save")
-                    }
-                    OutlinedButton(onClick = onShare, modifier = Modifier.weight(1f)) { Text("Share") }
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                    OutlinedButton(onClick = onOpenDocs, modifier = Modifier.weight(1f), enabled = item.update.bestDocsUrl().isNotBlank()) { Text("Docs") }
-                }
-                TextButton(onClick = onHide) { Text("Hide from lists") }
-                TextButton(onClick = onDismiss) { Text("Close") }
+                OutlinedButton(onClick = onShare, modifier = Modifier.weight(1f)) { Text("Share") }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                OutlinedButton(onClick = onOpenDocs, modifier = Modifier.weight(1f), enabled = item.update.bestDocsUrl().isNotBlank()) { Text("Docs") }
+            }
+            TextButton(onClick = onHide) { Text("Hide from lists") }
+        }
+    }
+}
+
+@Composable
+private fun TaskStatusDropdown(selected: TaskStatus, onSelected: (TaskStatus) -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
+
+    Box(modifier = Modifier.fillMaxWidth()) {
+        OutlinedButton(onClick = { expanded = true }, modifier = Modifier.fillMaxWidth()) {
+            Text(
+                text = "Status: ${selected.label}",
+                modifier = Modifier.weight(1f),
+                textAlign = TextAlign.Start,
+            )
+            Text("Select")
+        }
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+            modifier = Modifier.fillMaxWidth(0.9f),
+        ) {
+            TaskStatus.entries.forEach { status ->
+                DropdownMenuItem(
+                    text = { Text(status.label) },
+                    onClick = {
+                        onSelected(status)
+                        expanded = false
+                    },
+                )
             }
         }
     }
@@ -913,7 +1157,7 @@ private fun buildTimelineScrubTargets(items: List<ReleaseUpdateUi>, sort: Timeli
     if (positions.itemPositions.isEmpty()) return emptyList()
 
     val relativeAnchors = listOf(
-        TimelineAnchor("This last week", now.minusDays(7), TimelineAnchorKind.RelativeDate),
+        TimelineAnchor("Last week", now.minusDays(7), TimelineAnchorKind.RelativeDate),
         TimelineAnchor("2 weeks ago", now.minusDays(14), TimelineAnchorKind.RelativeDate),
         TimelineAnchor("3 weeks ago", now.minusDays(21), TimelineAnchorKind.RelativeDate),
         TimelineAnchor("Month ago", now.minusDays(28), TimelineAnchorKind.RelativeDate),
@@ -1024,9 +1268,14 @@ private fun StatusFilterRow(selected: String, onSelected: (String) -> Unit) {
 
 @Composable
 private fun MetricCard(label: String, value: String, modifier: Modifier = Modifier) {
-    ElevatedCard(modifier = modifier) {
-        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(label, style = MaterialTheme.typography.labelMedium)
+    ElevatedCard(modifier = modifier.height(96.dp)) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(14.dp),
+            verticalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text(label, style = MaterialTheme.typography.labelMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
             Text(value, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
         }
     }

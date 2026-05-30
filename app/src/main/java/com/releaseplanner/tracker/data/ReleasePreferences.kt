@@ -12,7 +12,7 @@ class ReleasePreferences(
 ) {
     private val prefs = context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
     private val sourceSettingsState = MutableStateFlow(readSourceSettings())
-    private val rewardPerformanceState = MutableStateFlow(readRewardPerformance())
+    private val rewardPerformanceState = MutableStateFlow(readRewardPerformance(syncLongest = true))
     private val themeModeState = MutableStateFlow(readThemeMode())
 
     val sourceSettings: StateFlow<List<ReleaseSourceSetting>> = sourceSettingsState
@@ -39,16 +39,44 @@ class ReleasePreferences(
 
     fun recordTaskRead(date: LocalDate = LocalDate.now()) {
         updateDateSet(READ_TASK_DATES_KEY, date)
-        rewardPerformanceState.value = readRewardPerformance()
+        rewardPerformanceState.value = readRewardPerformance(syncLongest = true)
     }
 
     fun recordTaskCompleted(date: LocalDate = LocalDate.now()) {
         updateDateSet(COMPLETE_TASK_DATES_KEY, date)
-        rewardPerformanceState.value = readRewardPerformance()
+        rewardPerformanceState.value = readRewardPerformance(syncLongest = true)
     }
 
     fun recordApiFailure(date: LocalDate = LocalDate.now()) {
         updateDateSet(API_FAILURE_DATES_KEY, date)
+        rewardPerformanceState.value = readRewardPerformance(syncLongest = true)
+    }
+
+    fun setDebugRewardState(readStreakDays: Int, completeStreakWeeks: Int, completedTaskCount: Int) {
+        prefs.edit()
+            .putInt(DEBUG_READ_STREAK_DAYS_KEY, readStreakDays.coerceAtLeast(0))
+            .putInt(DEBUG_COMPLETE_STREAK_WEEKS_KEY, completeStreakWeeks.coerceAtLeast(0))
+            .putInt(DEBUG_COMPLETED_TASK_COUNT_KEY, completedTaskCount.coerceAtLeast(0))
+            .apply()
+        rewardPerformanceState.value = readRewardPerformance(syncLongest = true)
+    }
+
+    fun toggleManualBadge(name: String, isCurrentlyComplete: Boolean) {
+        val completed = prefs.getStringSet(MANUAL_COMPLETED_BADGES_KEY, emptySet()).orEmpty().toMutableSet()
+        val open = prefs.getStringSet(MANUAL_OPEN_BADGES_KEY, emptySet()).orEmpty().toMutableSet()
+
+        if (isCurrentlyComplete) {
+            completed -= name
+            open += name
+        } else {
+            open -= name
+            completed += name
+        }
+
+        prefs.edit()
+            .putStringSet(MANUAL_COMPLETED_BADGES_KEY, completed)
+            .putStringSet(MANUAL_OPEN_BADGES_KEY, open)
+            .apply()
         rewardPerformanceState.value = readRewardPerformance()
     }
 
@@ -64,14 +92,37 @@ class ReleasePreferences(
         }
     }
 
-    private fun readRewardPerformance(): RewardPerformance {
+    private fun readRewardPerformance(syncLongest: Boolean = false): RewardPerformance {
         val readDates = readDateSet(READ_TASK_DATES_KEY)
         val completeDates = readDateSet(COMPLETE_TASK_DATES_KEY)
         val apiFailureDates = readDateSet(API_FAILURE_DATES_KEY)
+        val baseReadStreakDays = consecutiveDaysEndingToday(readDates, apiFailureDates)
+        val baseCompleteStreakWeeks = consecutiveWeeksEndingThisOrLastWeek(completeDates, apiFailureDates)
+        val readStreakDays = prefs.getOptionalInt(DEBUG_READ_STREAK_DAYS_KEY) ?: baseReadStreakDays
+        val completeStreakWeeks = prefs.getOptionalInt(DEBUG_COMPLETE_STREAK_WEEKS_KEY) ?: baseCompleteStreakWeeks
+        val longestReadStreakDays = maxOf(prefs.getInt(LONGEST_READ_STREAK_DAYS_KEY, 0), readStreakDays)
+        val longestCompleteStreakWeeks = maxOf(prefs.getInt(LONGEST_COMPLETE_STREAK_WEEKS_KEY, 0), completeStreakWeeks)
+
+        if (syncLongest) {
+            prefs.edit()
+                .putInt(LONGEST_READ_STREAK_DAYS_KEY, longestReadStreakDays)
+                .putInt(LONGEST_COMPLETE_STREAK_WEEKS_KEY, longestCompleteStreakWeeks)
+                .apply()
+        }
+
         return RewardPerformance(
-            readStreakDays = consecutiveDaysEndingToday(readDates, apiFailureDates),
-            completeStreakWeeks = consecutiveWeeksEndingThisOrLastWeek(completeDates, apiFailureDates),
+            readStreakDays = readStreakDays,
+            completeStreakWeeks = completeStreakWeeks,
+            longestReadStreakDays = longestReadStreakDays,
+            longestCompleteStreakWeeks = longestCompleteStreakWeeks,
+            completedTaskOverride = prefs.getOptionalInt(DEBUG_COMPLETED_TASK_COUNT_KEY),
+            manuallyCompletedBadges = prefs.getStringSet(MANUAL_COMPLETED_BADGES_KEY, emptySet()).orEmpty(),
+            manuallyOpenBadges = prefs.getStringSet(MANUAL_OPEN_BADGES_KEY, emptySet()).orEmpty(),
         )
+    }
+
+    private fun android.content.SharedPreferences.getOptionalInt(key: String): Int? {
+        return if (contains(key)) getInt(key, 0) else null
     }
 
     private fun readThemeMode(): ReleaseThemeMode {
@@ -139,6 +190,13 @@ class ReleasePreferences(
         const val COMPLETE_TASK_DATES_KEY = "complete_task_dates"
         const val API_FAILURE_DATES_KEY = "api_failure_dates"
         const val THEME_MODE_KEY = "theme_mode"
+        const val LONGEST_READ_STREAK_DAYS_KEY = "longest_read_streak_days"
+        const val LONGEST_COMPLETE_STREAK_WEEKS_KEY = "longest_complete_streak_weeks"
+        const val DEBUG_READ_STREAK_DAYS_KEY = "debug_read_streak_days"
+        const val DEBUG_COMPLETE_STREAK_WEEKS_KEY = "debug_complete_streak_weeks"
+        const val DEBUG_COMPLETED_TASK_COUNT_KEY = "debug_completed_task_count"
+        const val MANUAL_COMPLETED_BADGES_KEY = "manual_completed_badges"
+        const val MANUAL_OPEN_BADGES_KEY = "manual_open_badges"
     }
 }
 
@@ -158,4 +216,9 @@ data class ReleaseSourceSetting(
 data class RewardPerformance(
     val readStreakDays: Int,
     val completeStreakWeeks: Int,
+    val longestReadStreakDays: Int,
+    val longestCompleteStreakWeeks: Int,
+    val completedTaskOverride: Int?,
+    val manuallyCompletedBadges: Set<String>,
+    val manuallyOpenBadges: Set<String>,
 )
