@@ -10,11 +10,14 @@ import java.time.format.DateTimeFormatter
 import java.time.format.DateTimeParseException
 import java.util.Locale
 
-private val displayFormat = DateTimeFormatter.ofPattern("MMM d, yyyy", Locale.US)
+private val displayFormat = DateTimeFormatter.ofPattern("MMM d yyyy", Locale.US)
 private val rawDateFormats = listOf(
     DateTimeFormatter.ofPattern("M/d/yyyy", Locale.US),
     DateTimeFormatter.ofPattern("MM/dd/yyyy", Locale.US),
     DateTimeFormatter.ofPattern("MMM d, yyyy", Locale.US),
+    DateTimeFormatter.ofPattern("MMM d yyyy", Locale.US),
+    DateTimeFormatter.ofPattern("MMMM d, yyyy", Locale.US),
+    DateTimeFormatter.ofPattern("MMMM d yyyy", Locale.US),
 )
 private val monthYearFormat = DateTimeFormatter.ofPattern("MMM yyyy", Locale.US)
 
@@ -24,11 +27,23 @@ fun String.htmlToText(): String {
 }
 
 fun ReleaseUpdateEntity.primaryDateLabel(): String {
-    return gaDateValue.takeMeaningful()
+    return gaDateValue.toDisplayDate()
         ?: gaDate.toDisplayDate()
-        ?: ppDateValue.takeMeaningful()
+        ?: ppDateValue.toDisplayDate()
         ?: publicPreviewDate.toDisplayDate()
         ?: "Date not announced"
+}
+
+fun ReleaseUpdateEntity.earlyAccessDateLabel(): String {
+    return eaDateValue.toDisplayDate() ?: earlyAccessDate.toDisplayDate() ?: "-"
+}
+
+fun ReleaseUpdateEntity.publicPreviewDateLabel(): String {
+    return ppDateValue.toDisplayDate() ?: publicPreviewDate.toDisplayDate() ?: "-"
+}
+
+fun ReleaseUpdateEntity.gaDateLabel(): String {
+    return gaDateValue.toDisplayDate() ?: gaDate.toDisplayDate() ?: "-"
 }
 
 fun ReleaseUpdateEntity.releaseDate(): LocalDate? {
@@ -41,9 +56,9 @@ fun ReleaseUpdateEntity.releaseDate(): LocalDate? {
 fun ReleaseUpdateEntity.timelineDate(sort: TimelineSortOption): LocalDate? {
     return when (sort) {
         TimelineSortOption.LastUpdate -> parseReleaseDate(gitCommitDate)
-        TimelineSortOption.EarlyAccess -> parseReleaseDate(earlyAccessDate) ?: parseReleaseDate(eaDateValue)
-        TimelineSortOption.PublicPreview -> parseReleaseDate(publicPreviewDate) ?: parseReleaseDate(ppDateValue)
-        TimelineSortOption.GeneralAvailability -> parseReleaseDate(gaDate) ?: parseReleaseDate(gaDateValue)
+        TimelineSortOption.EarlyAccess -> parseReleaseDate(eaDateValue) ?: parseReleaseDate(earlyAccessDate)
+        TimelineSortOption.PublicPreview -> parseReleaseDate(ppDateValue) ?: parseReleaseDate(publicPreviewDate)
+        TimelineSortOption.GeneralAvailability -> parseReleaseDate(gaDateValue) ?: parseReleaseDate(gaDate)
     }
 }
 
@@ -84,7 +99,7 @@ fun ReleaseUpdateEntity.statusLabel(): String {
 
 fun Long.asSyncLabel(): String {
     val dateTime = Instant.ofEpochMilli(this).atZone(ZoneId.systemDefault()).toLocalDateTime()
-    val formatter = DateTimeFormatter.ofPattern("MMM d, h:mm a", Locale.US)
+    val formatter = DateTimeFormatter.ofPattern("MMM d h:mm a", Locale.US)
     return "Synced ${dateTime.format(formatter)}"
 }
 

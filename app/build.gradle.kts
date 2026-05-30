@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -6,12 +8,35 @@ plugins {
     id("com.google.devtools.ksp")
 }
 
+val localProperties = Properties().apply {
+    val localPropertiesFile = rootProject.file("local.properties")
+    if (localPropertiesFile.isFile) {
+        localPropertiesFile.inputStream().use { load(it) }
+    }
+}
+
+fun releaseSigningProperty(propertyName: String, environmentVariableName: String): String? =
+    localProperties.getProperty("release.$propertyName")
+        ?: providers.gradleProperty("release.$propertyName").orNull
+        ?: providers.environmentVariable(environmentVariableName).orNull
+
+val releaseStoreFile = releaseSigningProperty("storeFile", "RELEASE_STORE_FILE")
+val releaseStorePassword = releaseSigningProperty("storePassword", "RELEASE_STORE_PASSWORD")
+val releaseKeyAlias = releaseSigningProperty("keyAlias", "RELEASE_KEY_ALIAS")
+val releaseKeyPassword = releaseSigningProperty("keyPassword", "RELEASE_KEY_PASSWORD")
+val hasReleaseSigning = listOf(
+    releaseStoreFile,
+    releaseStorePassword,
+    releaseKeyAlias,
+    releaseKeyPassword,
+).all { !it.isNullOrBlank() }
+
 android {
     namespace = "com.releaseplanner.tracker"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.releaseplanner.tracker"
+        applicationId = "com.ppactracker.powerdevbox"
         minSdk = 26
         targetSdk = 35
         versionCode = 1
@@ -20,6 +45,25 @@ android {
 
     buildFeatures {
         compose = true
+    }
+
+    signingConfigs {
+        if (hasReleaseSigning) {
+            create("release") {
+                storeFile = rootProject.file(releaseStoreFile!!)
+                storePassword = releaseStorePassword
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeyPassword
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            if (hasReleaseSigning) {
+                signingConfig = signingConfigs.getByName("release")
+            }
+        }
     }
 
     val generatedConfigAssets = layout.buildDirectory.dir("generated/assets/releaseConfig")
@@ -66,6 +110,14 @@ val copyBadgeAssets by tasks.registering(Copy::class) {
 
 tasks.named("preBuild") {
     dependsOn(copyReleaseConfigAssets, copyBadgeAssets)
+}
+
+tasks.matching { it.name == "bundleRelease" || it.name == "assembleRelease" }.configureEach {
+    doFirst {
+        check(hasReleaseSigning) {
+            "Release signing is not configured. Add release.storeFile, release.storePassword, release.keyAlias, and release.keyPassword to local.properties or provide RELEASE_* environment variables."
+        }
+    }
 }
 
 dependencies {

@@ -33,6 +33,17 @@
                     android:host="updates"
                     android:scheme="ppactracker" />
             </intent-filter>
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+
+                <data
+                    android:host="wyattdave.com"
+                    android:pathPrefix="/ppac-tracker/task"
+                    android:scheme="https" />
+            </intent-filter>
         </activity>
     </application>
 

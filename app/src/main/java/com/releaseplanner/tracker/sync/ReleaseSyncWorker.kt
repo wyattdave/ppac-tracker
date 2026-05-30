@@ -17,6 +17,8 @@ class ReleaseSyncWorker(
         val database = ReleasePlannerDatabase.get(applicationContext)
         val sources = ReleaseConfigLoader.loadSources(applicationContext)
         val preferences = ReleasePreferences(applicationContext, sources)
+        if (!preferences.notificationSettings.value.enabled) return Result.success()
+
         val repository = ReleaseRepository(database, sources = sources, preferences = preferences)
         val result = repository.refresh()
 
@@ -24,9 +26,7 @@ class ReleaseSyncWorker(
             return Result.retry()
         }
 
-        if (result.hasChanges) {
-            ReleaseNotifications.showSyncNotification(applicationContext, result)
-        }
+        ReleaseNotifications.showSyncNotification(applicationContext, repository.summaryMetrics())
         return Result.success()
     }
 }

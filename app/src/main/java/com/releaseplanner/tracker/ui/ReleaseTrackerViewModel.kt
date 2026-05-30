@@ -13,6 +13,7 @@ import com.releaseplanner.tracker.data.local.ChangeEventEntity
 import com.releaseplanner.tracker.data.local.ReleasePlannerDatabase
 import com.releaseplanner.tracker.data.local.ReleaseUpdateEntity
 import com.releaseplanner.tracker.data.local.UserTrackingEntity
+import com.releaseplanner.tracker.sync.ReleaseSyncScheduler
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
@@ -103,8 +104,9 @@ class ReleaseTrackerViewModel(application: Application) : AndroidViewModel(appli
         preferences.sourceSettings,
         preferences.rewardPerformance,
         preferences.themeMode,
-    ) { sourceSettings, rewardPerformance, themeMode ->
-        ReleaseTrackerPreferenceState(sourceSettings, rewardPerformance, themeMode)
+        preferences.notificationSettings,
+    ) { sourceSettings, rewardPerformance, themeMode, notificationSettings ->
+        ReleaseTrackerPreferenceState(sourceSettings, rewardPerformance, themeMode, notificationSettings)
     }
 
     val uiState = combine(
@@ -158,6 +160,7 @@ class ReleaseTrackerViewModel(application: Application) : AndroidViewModel(appli
             recentEvents = data.events,
             sourceSettings = preferenceState.sourceSettings,
             themeMode = preferenceState.themeMode,
+            notificationSettings = preferenceState.notificationSettings,
             rewardProgress = rewards.toRewardProgress(preferenceState.rewardPerformance, completedTaskCount),
             rewardBadges = rewards.toRewardBadges(preferenceState.rewardPerformance, completedTaskCount),
             readStreakDays = preferenceState.rewardPerformance.readStreakDays,
@@ -201,6 +204,16 @@ class ReleaseTrackerViewModel(application: Application) : AndroidViewModel(appli
 
     fun setThemeMode(themeMode: ReleaseThemeMode) {
         preferences.setThemeMode(themeMode)
+    }
+
+    fun setNotificationEnabled(enabled: Boolean) {
+        preferences.setNotificationEnabled(enabled)
+        ReleaseSyncScheduler.schedule(getApplication(), preferences.notificationSettings.value)
+    }
+
+    fun setNotificationTime(hour: Int, minute: Int) {
+        preferences.setNotificationTime(hour, minute)
+        ReleaseSyncScheduler.schedule(getApplication(), preferences.notificationSettings.value)
     }
 
     fun setSearchQuery(query: String) {
@@ -359,6 +372,7 @@ class ReleaseTrackerViewModel(application: Application) : AndroidViewModel(appli
             "In Early Access" -> update.isCurrentlyInEarlyAccess()
             "In Public Preview" -> update.isCurrentlyInPublicPreview()
             "In GA" -> update.isCurrentlyInGa()
+            "GA this Week" -> update.isGaThisWeek()
             else -> true
         }
     }
@@ -379,8 +393,7 @@ class ReleaseTrackerViewModel(application: Application) : AndroidViewModel(appli
     }
 
     private fun defaultUpdateComparator(): Comparator<ReleaseUpdateUi> {
-        return compareBy<ReleaseUpdateUi> { it.isComplete || it.isSkipped }
-            .thenByDescending { it.update.timelineDate(TimelineSortOption.LastUpdate) ?: LocalDate.MIN }
+        return compareByDescending<ReleaseUpdateUi> { it.update.timelineDate(TimelineSortOption.LastUpdate) ?: LocalDate.MIN }
             .thenBy { it.update.featureName.lowercase() }
     }
 
@@ -399,6 +412,13 @@ class ReleaseTrackerViewModel(application: Application) : AndroidViewModel(appli
 
     private fun ReleaseUpdateEntity.isCurrentlyInGa(): Boolean {
         return gaStatus.isShippedStage()
+    }
+
+    private fun ReleaseUpdateEntity.isGaThisWeek(): Boolean {
+        val today = LocalDate.now()
+        val sevenDaysAhead = today.plusDays(7)
+        val gaDate = timelineDate(TimelineSortOption.GeneralAvailability) ?: return false
+        return !gaDate.isBefore(today) && !gaDate.isAfter(sevenDaysAhead)
     }
 
     private fun String.isShippedStage(): Boolean = equals("Shipped", ignoreCase = true)
@@ -519,5 +539,6 @@ class ReleaseTrackerViewModel(application: Application) : AndroidViewModel(appli
         val sourceSettings: List<com.releaseplanner.tracker.data.ReleaseSourceSetting>,
         val rewardPerformance: RewardPerformance,
         val themeMode: ReleaseThemeMode,
+        val notificationSettings: com.releaseplanner.tracker.data.NotificationSettings,
     )
 }

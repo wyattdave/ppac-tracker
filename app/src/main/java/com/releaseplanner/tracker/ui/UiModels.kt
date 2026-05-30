@@ -1,8 +1,11 @@
 package com.releaseplanner.tracker.ui
 
 import com.releaseplanner.tracker.data.ReleaseApiDiagnostic
+import com.releaseplanner.tracker.data.NotificationSettings
 import com.releaseplanner.tracker.data.ReleaseSourceSetting
+import com.releaseplanner.tracker.data.ReleaseSummaryMetrics
 import com.releaseplanner.tracker.data.ReleaseThemeMode
+import com.releaseplanner.tracker.data.calculateReleaseSummaryMetrics
 import com.releaseplanner.tracker.data.local.ChangeEventEntity
 import com.releaseplanner.tracker.data.local.ReleaseUpdateEntity
 import com.releaseplanner.tracker.data.local.UserTrackingEntity
@@ -63,6 +66,7 @@ data class ReleaseTrackerUiState(
     val recentEvents: List<ChangeEventEntity> = emptyList(),
     val sourceSettings: List<ReleaseSourceSetting> = emptyList(),
     val themeMode: ReleaseThemeMode = ReleaseThemeMode.Light,
+    val notificationSettings: NotificationSettings = NotificationSettings(),
     val rewardProgress: List<RewardProgressUi> = emptyList(),
     val rewardBadges: List<RewardBadgeUi> = emptyList(),
     val readStreakDays: Int = 0,
@@ -87,6 +91,11 @@ data class ReleaseTrackerUiState(
     val skippedCount: Int = visibleUpdates.count { it.isSkipped }
     val savedCount: Int = visibleUpdates.count { it.isSaved }
     val incompleteCount: Int = visibleUpdates.count { !it.isComplete && !it.isSkipped }
+    val summaryMetrics: ReleaseSummaryMetrics = calculateReleaseSummaryMetrics(
+        updates = filteredUpdates.map { it.update },
+        trackingByReleaseId = filteredUpdates.associate { it.update.id to it.tracking },
+        includeHidden = true,
+    )
 }
 
 data class ReleaseTrackerControls(

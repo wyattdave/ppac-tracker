@@ -10,6 +10,9 @@ interface ReleaseUpdateDao {
     @Query("SELECT * FROM release_updates ORDER BY featureName COLLATE NOCASE ASC")
     fun observeAll(): Flow<List<ReleaseUpdateEntity>>
 
+    @Query("SELECT * FROM release_updates ORDER BY featureName COLLATE NOCASE ASC")
+    suspend fun getAll(): List<ReleaseUpdateEntity>
+
     @Query("SELECT * FROM release_updates WHERE id = :id LIMIT 1")
     suspend fun getById(id: String): ReleaseUpdateEntity?
 

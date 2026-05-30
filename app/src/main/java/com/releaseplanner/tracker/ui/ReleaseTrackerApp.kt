@@ -3,6 +3,7 @@ package com.releaseplanner.tracker.ui
 import android.content.Context
 import android.content.Intent
 import android.graphics.BitmapFactory
+import android.text.Html
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
@@ -82,6 +83,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.releaseplanner.tracker.AppDeepLinks
 import com.releaseplanner.tracker.R
+import com.releaseplanner.tracker.data.NotificationSettings
 import com.releaseplanner.tracker.data.ReleaseSourceSetting
 import com.releaseplanner.tracker.data.ReleaseThemeMode
 import com.releaseplanner.tracker.data.local.ReleaseUpdateEntity
@@ -109,6 +111,7 @@ private val releaseStageFilters = listOf(
     "In Early Access",
     "In Public Preview",
     "In GA",
+    "GA this Week",
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -123,14 +126,7 @@ fun ReleaseTrackerApp(viewModel: ReleaseTrackerViewModel, state: ReleaseTrackerU
     var achievedBadge by remember { mutableStateOf<RewardBadgeUi?>(null) }
     var knownCompletedBadgeNames by remember { mutableStateOf<Set<String>?>(null) }
     var updatesFilterPanelVisible by remember { mutableStateOf(false) }
-    var showUpdatesFilterButton by remember { mutableStateOf(false) }
     var updatesResetToken by remember { mutableStateOf(0) }
-
-    LaunchedEffect(state.screen, selectedUpdate, showAllBadges) {
-        if (state.screen != AppScreen.Updates || selectedUpdate != null || showAllBadges) {
-            showUpdatesFilterButton = false
-        }
-    }
 
     LaunchedEffect(state.rewardBadges) {
         val completedNames = state.rewardBadges.filter { it.isComplete }.map { it.name }.toSet()
@@ -185,11 +181,11 @@ fun ReleaseTrackerApp(viewModel: ReleaseTrackerViewModel, state: ReleaseTrackerU
                                     contentDescription = "Back",
                                 )
                             }
-                        } else if (state.screen == AppScreen.Updates && showUpdatesFilterButton) {
-                            IconButton(onClick = { updatesFilterPanelVisible = true }) {
+                        } else if (state.screen == AppScreen.Updates) {
+                            IconButton(onClick = { updatesFilterPanelVisible = !updatesFilterPanelVisible }) {
                                 Icon(
                                     painter = painterResource(id = R.drawable.ic_filter_list),
-                                    contentDescription = "Show filters",
+                                    contentDescription = if (updatesFilterPanelVisible) "Hide filters" else "Show filters",
                                 )
                             }
                         }
@@ -255,6 +251,7 @@ fun ReleaseTrackerApp(viewModel: ReleaseTrackerViewModel, state: ReleaseTrackerU
                                     viewModel.selectUpdate(null)
                                 },
                                 onShare = { shareUpdate(context, selectedUpdate) },
+                                onEmail = { emailUpdate(context, selectedUpdate) },
                                 onOpenDocs = {
                                     selectedUpdate.update.bestDocsUrl().takeIf { it.isNotBlank() }?.let(uriHandler::openUri)
                                 },
@@ -284,7 +281,6 @@ fun ReleaseTrackerApp(viewModel: ReleaseTrackerViewModel, state: ReleaseTrackerU
                                     viewModel = viewModel,
                                     filterPanelVisible = updatesFilterPanelVisible,
                                     onFilterPanelVisibleChange = { updatesFilterPanelVisible = it },
-                                    onHeaderFilterVisibilityChange = { showUpdatesFilterButton = it },
                                     resetToken = updatesResetToken,
                                 )
                                 AppScreen.Timeline -> TimelineScreen(state, viewModel)
@@ -357,19 +353,13 @@ private fun UpdatesScreen(
     viewModel: ReleaseTrackerViewModel,
     filterPanelVisible: Boolean,
     onFilterPanelVisibleChange: (Boolean) -> Unit,
-    onHeaderFilterVisibilityChange: (Boolean) -> Unit,
     resetToken: Int,
 ) {
     val listState = rememberLazyListState()
-    val controlsScrolledAway = listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 0
 
     LaunchedEffect(resetToken) {
         onFilterPanelVisibleChange(false)
         listState.scrollToItem(0)
-    }
-
-    LaunchedEffect(controlsScrolledAway, filterPanelVisible) {
-        onHeaderFilterVisibilityChange(controlsScrolledAway && !filterPanelVisible)
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
@@ -405,9 +395,9 @@ private fun UpdatesScreen(
 private fun UpdatesOverviewAndFilters(state: ReleaseTrackerUiState, viewModel: ReleaseTrackerViewModel) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-            MetricCard("Today", state.todayCount.toString(), Modifier.weight(1f))
-            MetricCard("Done", state.todayCompleteCount.toString(), Modifier.weight(1f))
-            MetricCard("Complete total", state.completeCount.toString(), Modifier.weight(1f))
+            MetricCard("Total Open", state.summaryMetrics.totalOpen.toString(), Modifier.weight(1f))
+            MetricCard("Total last 7 days", state.summaryMetrics.totalLastSevenDays.toString(), Modifier.weight(1f))
+            MetricCard("Total GA this week", state.summaryMetrics.totalGaThisWeek.toString(), Modifier.weight(1f))
         }
         UpdatesFilterControls(state = state, viewModel = viewModel)
     }
@@ -556,6 +546,11 @@ private fun SettingsScreen(
                 }
             }
         }
+        NotificationSettingsCard(
+            settings = state.notificationSettings,
+            onEnabledChange = viewModel::setNotificationEnabled,
+            onTimeSelected = viewModel::setNotificationTime,
+        )
         ProductSettingsCard(
             settings = state.sourceSettings,
             onToggle = viewModel::setProductEnabled,
@@ -594,15 +589,6 @@ private fun SettingsScreen(
                     }
                 }
             }
-        }
-        ElevatedCard(modifier = Modifier.fillMaxWidth()) {
-            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Notifications", style = MaterialTheme.typography.titleMedium)
-                Text("The app checks for updates in the background and uses local Android notifications. Product settings and streak progress are included in Android backup and device transfer.")
-            }
-        }
-        OutlinedButton(onClick = viewModel::clearBadges) {
-            Text("Clear changed badges")
         }
         AboutCard(
             onTapped = onAboutTapped,
@@ -1013,6 +999,102 @@ private fun BadgeAchievementOverlay(
 }
 
 @Composable
+private fun NotificationSettingsCard(
+    settings: NotificationSettings,
+    onEnabledChange: (Boolean) -> Unit,
+    onTimeSelected: (Int, Int) -> Unit,
+) {
+    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text("Notifications", style = MaterialTheme.typography.titleMedium)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text("Daily summary", style = MaterialTheme.typography.bodyLarge)
+                    Text(
+                        text = if (settings.enabled) "Runs at ${settings.timeLabel}" else "Turned off",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Switch(checked = settings.enabled, onCheckedChange = onEnabledChange)
+            }
+            if (settings.enabled) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                    NumberDropdown(
+                        label = "Hour",
+                        selected = settings.hour,
+                        values = (0..23).toList(),
+                        onSelected = { hour -> onTimeSelected(hour, settings.minute) },
+                        modifier = Modifier.weight(1f),
+                    )
+                    NumberDropdown(
+                        label = "Minute",
+                        selected = settings.minute,
+                        values = (0..59).toList(),
+                        onSelected = { minute -> onTimeSelected(settings.hour, minute) },
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+            }
+            Text(
+                text = "Product settings and streak progress are included in Android backup and device transfer.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+@Composable
+private fun NumberDropdown(
+    label: String,
+    selected: Int,
+    values: List<Int>,
+    onSelected: (Int) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    var expanded by remember { mutableStateOf(false) }
+
+    Box(modifier = modifier) {
+        OutlinedButton(
+            onClick = { expanded = true },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(48.dp),
+            contentPadding = PaddingValues(horizontal = 16.dp),
+        ) {
+            Text(
+                text = "$label: ${selected.toPaddedTimeSegment()}",
+                modifier = Modifier.fillMaxWidth(),
+                textAlign = TextAlign.Center,
+                maxLines = 1,
+            )
+        }
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+            modifier = Modifier.heightIn(max = 280.dp),
+        ) {
+            values.forEach { value ->
+                DropdownMenuItem(
+                    text = { Text(value.toPaddedTimeSegment()) },
+                    onClick = {
+                        onSelected(value)
+                        expanded = false
+                    },
+                )
+            }
+        }
+    }
+}
+
+private fun Int.toPaddedTimeSegment(): String = toString().padStart(2, '0')
+
+@Composable
 private fun ProductSettingsCard(
     settings: List<ReleaseSourceSetting>,
     onToggle: (String, Boolean) -> Unit,
@@ -1152,6 +1234,7 @@ private fun UpdateDetailSection(
     onToggleSaved: () -> Unit,
     onHide: () -> Unit,
     onShare: () -> Unit,
+    onEmail: () -> Unit,
     onOpenDocs: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -1181,9 +1264,9 @@ private fun UpdateDetailSection(
             }
             DetailLine("Area", item.update.productArea)
             DetailLine("Date", item.update.primaryDateLabel())
-            DetailLine("EarlyAccessDate", item.update.earlyAccessDate.ifBlank { "-" })
-            DetailLine("PublicPreviewDate", item.update.publicPreviewDate.ifBlank { "-" })
-            DetailLine("GADate", item.update.gaDate.ifBlank { "-" })
+            DetailLine("EarlyAccessDate", item.update.earlyAccessDateLabel())
+            DetailLine("PublicPreviewDate", item.update.publicPreviewDateLabel())
+            DetailLine("GADate", item.update.gaDateLabel())
             DetailLine("Enabled for", item.update.enabledFor)
             DetailLine("Wave", item.update.gaReleaseWaveName.ifBlank { item.update.releaseWaveName })
             SectionTitle("Business value")
@@ -1199,6 +1282,7 @@ private fun UpdateDetailSection(
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                 OutlinedButton(onClick = onOpenDocs, modifier = Modifier.weight(1f), enabled = item.update.bestDocsUrl().isNotBlank()) { Text("Docs") }
+                OutlinedButton(onClick = onEmail, modifier = Modifier.weight(1f)) { Text("Email") }
             }
             TextButton(onClick = onHide) { Text("Hide from lists") }
         }
@@ -1504,21 +1588,66 @@ private fun ReleaseUpdateEntity.bestDocsUrl(): String {
 
 private fun shareUpdate(context: Context, item: ReleaseUpdateUi) {
     val update = item.update
+    val docsLink = update.bestDocsUrl().takeIf { it.isNotBlank() }
+    val subject = "${update.product}: ${update.featureName}"
     val text = buildString {
         appendLine("${update.product} release update:")
         appendLine(update.featureName)
         appendLine()
         appendLine("Status: ${update.statusLabel()}")
         appendLine("Date: ${update.primaryDateLabel()}")
-        appendLine("Open in PPAC Tracker: ${AppDeepLinks.taskUri(update.id)}")
-        update.bestDocsUrl().takeIf { it.isNotBlank() }?.let { appendLine("Docs: $it") }
+        docsLink?.let { appendLine("Docs: $it") }
     }
     val intent = Intent(Intent.ACTION_SEND).apply {
         type = "text/plain"
+        putExtra(Intent.EXTRA_SUBJECT, subject)
+        putExtra(Intent.EXTRA_TITLE, subject)
         putExtra(Intent.EXTRA_TEXT, text)
     }
     context.startActivity(Intent.createChooser(intent, "Share release update"))
 }
+
+private fun emailUpdate(context: Context, item: ReleaseUpdateUi) {
+    val update = item.update
+    val appLink = AppDeepLinks.taskUri(update.id)
+    val docsLink = update.bestDocsUrl().takeIf { it.isNotBlank() }
+    val subject = "${update.product}: ${update.featureName}"
+    val html = buildEmailHtml(update, appLink, docsLink)
+    val intent = Intent(Intent.ACTION_SEND).apply {
+        type = "message/rfc822"
+        putExtra(Intent.EXTRA_SUBJECT, subject)
+        putExtra(Intent.EXTRA_TEXT, Html.fromHtml(html, Html.FROM_HTML_MODE_LEGACY))
+        putExtra(Intent.EXTRA_HTML_TEXT, html)
+    }
+    context.startActivity(Intent.createChooser(intent, "Email release update"))
+}
+
+private fun buildEmailHtml(update: ReleaseUpdateEntity, appLink: String, docsLink: String?): String {
+    return buildString {
+        append("<p><strong>")
+        append("${update.product} release update:".htmlEscaped())
+        append("</strong><br>")
+        append(update.featureName.htmlEscaped())
+        append("</p>")
+        append("<p>Status: ")
+        append(update.statusLabel().htmlEscaped())
+        append("<br>Date: ")
+        append(update.primaryDateLabel().htmlEscaped())
+        append("</p>")
+        append("<p><a href=\"")
+        append(appLink.htmlEscaped())
+        append("\">Open in PPAC Tracker</a></p>")
+        docsLink?.let { link ->
+            append("<p>Docs: <a href=\"")
+            append(link.htmlEscaped())
+            append("\">")
+            append(link.htmlEscaped())
+            append("</a></p>")
+        }
+    }
+}
+
+private fun String.htmlEscaped(): String = Html.escapeHtml(this)
 
 private fun productColor(product: String): Color {
     return when {

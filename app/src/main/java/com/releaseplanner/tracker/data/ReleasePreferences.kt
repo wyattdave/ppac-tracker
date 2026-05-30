@@ -14,10 +14,12 @@ class ReleasePreferences(
     private val sourceSettingsState = MutableStateFlow(readSourceSettings())
     private val rewardPerformanceState = MutableStateFlow(readRewardPerformance(syncLongest = true))
     private val themeModeState = MutableStateFlow(readThemeMode())
+    private val notificationSettingsState = MutableStateFlow(readNotificationSettings())
 
     val sourceSettings: StateFlow<List<ReleaseSourceSetting>> = sourceSettingsState
     val rewardPerformance: StateFlow<RewardPerformance> = rewardPerformanceState
     val themeMode: StateFlow<ReleaseThemeMode> = themeModeState
+    val notificationSettings: StateFlow<NotificationSettings> = notificationSettingsState
 
     fun enabledSources(): List<ReleaseSource> {
         return sources.filter { isProductEnabled(it) }
@@ -35,6 +37,19 @@ class ReleasePreferences(
     fun setThemeMode(themeMode: ReleaseThemeMode) {
         prefs.edit().putString(THEME_MODE_KEY, themeMode.name).apply()
         themeModeState.value = themeMode
+    }
+
+    fun setNotificationEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean(NOTIFICATIONS_ENABLED_KEY, enabled).apply()
+        notificationSettingsState.value = readNotificationSettings()
+    }
+
+    fun setNotificationTime(hour: Int, minute: Int) {
+        prefs.edit()
+            .putInt(NOTIFICATION_HOUR_KEY, hour.coerceIn(0, 23))
+            .putInt(NOTIFICATION_MINUTE_KEY, minute.coerceIn(0, 59))
+            .apply()
+        notificationSettingsState.value = readNotificationSettings()
     }
 
     fun recordTaskRead(date: LocalDate = LocalDate.now()) {
@@ -130,6 +145,14 @@ class ReleasePreferences(
         return ReleaseThemeMode.entries.firstOrNull { it.name == stored } ?: ReleaseThemeMode.Light
     }
 
+    private fun readNotificationSettings(): NotificationSettings {
+        return NotificationSettings(
+            enabled = prefs.getBoolean(NOTIFICATIONS_ENABLED_KEY, true),
+            hour = prefs.getInt(NOTIFICATION_HOUR_KEY, NotificationSettings.DEFAULT_HOUR).coerceIn(0, 23),
+            minute = prefs.getInt(NOTIFICATION_MINUTE_KEY, NotificationSettings.DEFAULT_MINUTE).coerceIn(0, 59),
+        )
+    }
+
     private fun updateDateSet(key: String, date: LocalDate) {
         val values = prefs.getStringSet(key, emptySet()).orEmpty().toMutableSet()
         values += date.toString()
@@ -190,6 +213,9 @@ class ReleasePreferences(
         const val COMPLETE_TASK_DATES_KEY = "complete_task_dates"
         const val API_FAILURE_DATES_KEY = "api_failure_dates"
         const val THEME_MODE_KEY = "theme_mode"
+        const val NOTIFICATIONS_ENABLED_KEY = "notifications_enabled"
+        const val NOTIFICATION_HOUR_KEY = "notification_hour"
+        const val NOTIFICATION_MINUTE_KEY = "notification_minute"
         const val LONGEST_READ_STREAK_DAYS_KEY = "longest_read_streak_days"
         const val LONGEST_COMPLETE_STREAK_WEEKS_KEY = "longest_complete_streak_weeks"
         const val DEBUG_READ_STREAK_DAYS_KEY = "debug_read_streak_days"
@@ -222,3 +248,16 @@ data class RewardPerformance(
     val manuallyCompletedBadges: Set<String>,
     val manuallyOpenBadges: Set<String>,
 )
+
+data class NotificationSettings(
+    val enabled: Boolean = true,
+    val hour: Int = DEFAULT_HOUR,
+    val minute: Int = DEFAULT_MINUTE,
+) {
+    val timeLabel: String = "%02d:%02d".format(hour, minute)
+
+    companion object {
+        const val DEFAULT_HOUR = 8
+        const val DEFAULT_MINUTE = 0
+    }
+}

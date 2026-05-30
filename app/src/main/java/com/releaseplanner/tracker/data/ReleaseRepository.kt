@@ -82,6 +82,14 @@ class ReleaseRepository(
         return client.debug((preferences?.enabledSources() ?: sources).firstOrNull() ?: sources.first())
     }
 
+    suspend fun summaryMetrics(): ReleaseSummaryMetrics {
+        val enabledSourceProducts = (preferences?.enabledSources() ?: sources).map { it.product }.toSet()
+        val updates = database.releaseUpdateDao().getAll()
+            .filter { it.sourceProduct in enabledSourceProducts }
+        val trackingByReleaseId = database.trackingDao().getAll().associateBy { it.releaseId }
+        return calculateReleaseSummaryMetrics(updates, trackingByReleaseId)
+    }
+
     suspend fun clearSyncBadges() {
         database.releaseUpdateDao().clearSyncBadges()
     }

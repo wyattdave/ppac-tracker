@@ -10,7 +10,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import com.releaseplanner.tracker.R
-import com.releaseplanner.tracker.data.SyncResult
+import com.releaseplanner.tracker.data.ReleaseSummaryMetrics
 
 object ReleaseNotifications {
     private const val channelId = "release_updates"
@@ -28,7 +28,7 @@ object ReleaseNotifications {
         context.getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
     }
 
-    fun showSyncNotification(context: Context, result: SyncResult) {
+    fun showSyncNotification(context: Context, metrics: ReleaseSummaryMetrics) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             val granted = ContextCompat.checkSelfPermission(
                 context,
@@ -37,16 +37,11 @@ object ReleaseNotifications {
             if (!granted) return
         }
 
-        val text = buildString {
-            if (result.newCount > 0) append("${result.newCount} new")
-            if (result.newCount > 0 && result.changedCount > 0) append(", ")
-            if (result.changedCount > 0) append("${result.changedCount} changed")
-            append(" release updates")
-        }
+        val text = "Open: ${metrics.totalOpen}, last 7 days: ${metrics.totalLastSevenDays}, GA this week: ${metrics.totalGaThisWeek}"
 
         val notification = NotificationCompat.Builder(context, channelId)
             .setSmallIcon(R.drawable.ic_launcher_foreground)
-            .setContentTitle("Release planner updated")
+            .setContentTitle("Release planner summary")
             .setContentText(text)
             .setStyle(NotificationCompat.BigTextStyle().bigText(text))
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
