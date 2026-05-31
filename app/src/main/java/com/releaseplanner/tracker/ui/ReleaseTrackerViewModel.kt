@@ -18,8 +18,11 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.time.Duration
 import java.time.LocalDate
+import java.time.LocalDateTime
 
 class ReleaseTrackerViewModel(application: Application) : AndroidViewModel(application) {
     private val sources = ReleaseConfigLoader.loadSources(application)
@@ -142,7 +145,8 @@ class ReleaseTrackerViewModel(application: Application) : AndroidViewModel(appli
             .sortedWith(timelineComparator(controls.timelineSort))
         val selected = items.firstOrNull { it.update.id == controls.selectedUpdateId }
         val lastSeenAt = data.updates.maxOfOrNull { it.lastSeenAt }
-        val completedTaskCount = preferenceState.rewardPerformance.completedTaskOverride ?: items.count { it.isComplete }
+        val actualCompletedTaskCount = items.count { it.isComplete }
+        val completedTaskCount = maxOf(preferenceState.rewardPerformance.completedTaskOverride ?: 0, actualCompletedTaskCount)
 
         ReleaseTrackerUiState(
             screen = controls.screen,
@@ -183,6 +187,12 @@ class ReleaseTrackerViewModel(application: Application) : AndroidViewModel(appli
     init {
         viewModelScope.launch {
             if (repository.isEmpty()) refresh()
+        }
+        viewModelScope.launch {
+            while (true) {
+                delay(millisecondsUntilNextDay())
+                preferences.refreshRewardPerformance()
+            }
         }
     }
 
@@ -422,6 +432,12 @@ class ReleaseTrackerViewModel(application: Application) : AndroidViewModel(appli
     }
 
     private fun String.isShippedStage(): Boolean = equals("Shipped", ignoreCase = true)
+
+    private fun millisecondsUntilNextDay(): Long {
+        val now = LocalDateTime.now()
+        val nextDay = now.toLocalDate().plusDays(1).atStartOfDay().plusSeconds(1)
+        return Duration.between(now, nextDay).toMillis().coerceAtLeast(1_000)
+    }
 
     private fun List<RewardDefinition>.toRewardProgress(
         performance: RewardPerformance,

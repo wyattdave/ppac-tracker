@@ -216,7 +216,7 @@ fun ReleaseTrackerApp(viewModel: ReleaseTrackerViewModel, state: ReleaseTrackerU
                             onClick = {
                                 showAllBadges = false
                                 if (screen == AppScreen.Updates) {
-                                    updatesFilterPanelVisible = false
+                                    updatesFilterPanelVisible = true
                                     updatesResetToken += 1
                                 }
                                 viewModel.selectScreen(screen)
@@ -280,7 +280,6 @@ fun ReleaseTrackerApp(viewModel: ReleaseTrackerViewModel, state: ReleaseTrackerU
                                     state = state,
                                     viewModel = viewModel,
                                     filterPanelVisible = updatesFilterPanelVisible,
-                                    onFilterPanelVisibleChange = { updatesFilterPanelVisible = it },
                                     resetToken = updatesResetToken,
                                 )
                                 AppScreen.Timeline -> TimelineScreen(state, viewModel)
@@ -352,34 +351,27 @@ private fun UpdatesScreen(
     state: ReleaseTrackerUiState,
     viewModel: ReleaseTrackerViewModel,
     filterPanelVisible: Boolean,
-    onFilterPanelVisibleChange: (Boolean) -> Unit,
     resetToken: Int,
 ) {
     val listState = rememberLazyListState()
 
     LaunchedEffect(resetToken) {
-        onFilterPanelVisibleChange(false)
         listState.scrollToItem(0)
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
-        if (filterPanelVisible) {
-            UpdatesFilterControls(
-                state = state,
-                viewModel = viewModel,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-            )
-        }
+        UpdatesOverviewAndFilters(
+            state = state,
+            viewModel = viewModel,
+            filterPanelVisible = filterPanelVisible,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+        )
         LazyColumn(
             state = listState,
+            modifier = Modifier.weight(1f),
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            if (!filterPanelVisible) {
-                item(key = "updates-overview-and-filters") {
-                    UpdatesOverviewAndFilters(state = state, viewModel = viewModel)
-                }
-            }
             if (state.filteredUpdates.isEmpty()) {
                 item { EmptyState("No updates match these filters.") }
             } else {
@@ -392,14 +384,21 @@ private fun UpdatesScreen(
 }
 
 @Composable
-private fun UpdatesOverviewAndFilters(state: ReleaseTrackerUiState, viewModel: ReleaseTrackerViewModel) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+private fun UpdatesOverviewAndFilters(
+    state: ReleaseTrackerUiState,
+    viewModel: ReleaseTrackerViewModel,
+    filterPanelVisible: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
             MetricCard("Total Open", state.summaryMetrics.totalOpen.toString(), Modifier.weight(1f))
             MetricCard("Total last 7 days", state.summaryMetrics.totalLastSevenDays.toString(), Modifier.weight(1f))
             MetricCard("Total GA this week", state.summaryMetrics.totalGaThisWeek.toString(), Modifier.weight(1f))
         }
-        UpdatesFilterControls(state = state, viewModel = viewModel)
+        if (filterPanelVisible) {
+            UpdatesFilterControls(state = state, viewModel = viewModel)
+        }
     }
 }
 
@@ -594,6 +593,7 @@ private fun SettingsScreen(
             onTapped = onAboutTapped,
             onOpenWyattDave = { uriHandler.openUri("https://wyattdave.com") },
             onOpenPowerDevBox = { uriHandler.openUri("https://powerdevbox.com") },
+            onOpenReleasePlans = { uriHandler.openUri("https://releaseplans.net/") },
         )
         if (rewardDebugEnabled) {
             RewardDebugCard(
@@ -840,6 +840,7 @@ private fun AboutCard(
     onTapped: () -> Unit,
     onOpenWyattDave: () -> Unit,
     onOpenPowerDevBox: () -> Unit,
+    onOpenReleasePlans: () -> Unit,
 ) {
     ElevatedCard(
         modifier = Modifier
@@ -853,6 +854,8 @@ private fun AboutCard(
                 LinkListItem("https://wyattdave.com", onOpenWyattDave)
                 LinkListItem("https://powerdevbox.com", onOpenPowerDevBox)
             }
+            Text("For a more detailed view on your laptop we recommend checking out:")
+            LinkListItem("https://releaseplans.net/", onOpenReleasePlans)
         }
     }
 }
