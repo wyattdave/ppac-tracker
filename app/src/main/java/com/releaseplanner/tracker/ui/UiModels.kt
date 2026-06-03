@@ -74,6 +74,7 @@ data class ReleaseTrackerUiState(
     val longestReadStreakDays: Int = 0,
     val longestCompleteStreakWeeks: Int = 0,
     val rewardCompletedTaskCount: Int = 0,
+    val announcedRewardBadgeNames: Set<String> = emptySet(),
     val isRefreshing: Boolean = false,
     val isDebugLoading: Boolean = false,
     val errorMessage: String? = null,

@@ -172,6 +172,7 @@ class ReleaseTrackerViewModel(application: Application) : AndroidViewModel(appli
             longestReadStreakDays = preferenceState.rewardPerformance.longestReadStreakDays,
             longestCompleteStreakWeeks = preferenceState.rewardPerformance.longestCompleteStreakWeeks,
             rewardCompletedTaskCount = completedTaskCount,
+            announcedRewardBadgeNames = preferenceState.rewardPerformance.announcedRewardBadges,
             isRefreshing = meta.isRefreshing,
             isDebugLoading = meta.isDebugLoading,
             errorMessage = meta.errorMessage,
@@ -218,12 +219,12 @@ class ReleaseTrackerViewModel(application: Application) : AndroidViewModel(appli
 
     fun setNotificationEnabled(enabled: Boolean) {
         preferences.setNotificationEnabled(enabled)
-        ReleaseSyncScheduler.schedule(getApplication(), preferences.notificationSettings.value)
+        ReleaseSyncScheduler.reschedule(getApplication(), preferences.notificationSettings.value)
     }
 
     fun setNotificationTime(hour: Int, minute: Int) {
         preferences.setNotificationTime(hour, minute)
-        ReleaseSyncScheduler.schedule(getApplication(), preferences.notificationSettings.value)
+        ReleaseSyncScheduler.reschedule(getApplication(), preferences.notificationSettings.value)
     }
 
     fun setSearchQuery(query: String) {
@@ -338,6 +339,10 @@ class ReleaseTrackerViewModel(application: Application) : AndroidViewModel(appli
 
     fun toggleBadgeReceived(name: String, isCurrentlyComplete: Boolean) {
         preferences.toggleManualBadge(name, isCurrentlyComplete)
+    }
+
+    fun markRewardBadgesAnnounced(names: Set<String>) {
+        preferences.markRewardBadgesAnnounced(names)
     }
 
     fun toggleSkipped(id: String) {

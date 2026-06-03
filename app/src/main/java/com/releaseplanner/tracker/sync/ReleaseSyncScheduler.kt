@@ -16,6 +16,18 @@ object ReleaseSyncScheduler {
     private const val workName = "release-planner-sync"
 
     fun schedule(context: Context, settings: NotificationSettings) {
+        enqueue(context, settings, ExistingPeriodicWorkPolicy.KEEP)
+    }
+
+    fun reschedule(context: Context, settings: NotificationSettings) {
+        enqueue(context, settings, ExistingPeriodicWorkPolicy.CANCEL_AND_REENQUEUE)
+    }
+
+    private fun enqueue(
+        context: Context,
+        settings: NotificationSettings,
+        existingWorkPolicy: ExistingPeriodicWorkPolicy,
+    ) {
         if (!settings.enabled) {
             cancel(context)
             return
@@ -32,7 +44,7 @@ object ReleaseSyncScheduler {
 
         WorkManager.getInstance(context).enqueueUniquePeriodicWork(
             workName,
-            ExistingPeriodicWorkPolicy.CANCEL_AND_REENQUEUE,
+            existingWorkPolicy,
             request,
         )
     }

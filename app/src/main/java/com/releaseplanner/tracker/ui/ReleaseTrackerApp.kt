@@ -55,12 +55,15 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
 import androidx.compose.ui.res.painterResource
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.rememberDatePickerState
+import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -128,15 +131,20 @@ fun ReleaseTrackerApp(viewModel: ReleaseTrackerViewModel, state: ReleaseTrackerU
     var updatesFilterPanelVisible by remember { mutableStateOf(false) }
     var updatesResetToken by remember { mutableStateOf(0) }
 
-    LaunchedEffect(state.rewardBadges) {
+    LaunchedEffect(state.rewardBadges, state.announcedRewardBadgeNames) {
         val completedNames = state.rewardBadges.filter { it.isComplete }.map { it.name }.toSet()
         val previousNames = knownCompletedBadgeNames
         if (previousNames == null) {
-            knownCompletedBadgeNames = completedNames
+            if (state.rewardBadges.isNotEmpty()) {
+                knownCompletedBadgeNames = completedNames
+                viewModel.markRewardBadgesAnnounced(completedNames)
+            }
         } else {
             val newNames = completedNames - previousNames
-            if (newNames.isNotEmpty()) {
-                achievedBadge = state.rewardBadges.firstOrNull { it.name in newNames }
+            val unannouncedNewNames = newNames - state.announcedRewardBadgeNames
+            if (unannouncedNewNames.isNotEmpty()) {
+                achievedBadge = state.rewardBadges.firstOrNull { it.name in unannouncedNewNames }
+                viewModel.markRewardBadgesAnnounced(unannouncedNewNames)
             }
             knownCompletedBadgeNames = completedNames
         }
@@ -376,9 +384,74 @@ private fun UpdatesScreen(
                 item { EmptyState("No updates match these filters.") }
             } else {
                 items(state.filteredUpdates, key = { it.update.id }) { item ->
-                    ReleaseUpdateRow(item = item, onClick = { viewModel.selectUpdate(item.update.id) })
+                    SwipeableReleaseUpdateRow(
+                        item = item,
+                        onClick = { viewModel.selectUpdate(item.update.id) },
+                        onComplete = { viewModel.setTaskStatus(item.update.id, TaskStatus.Complete) },
+                        onSkip = { viewModel.setTaskStatus(item.update.id, TaskStatus.Skipped) },
+                    )
                 }
             }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SwipeableReleaseUpdateRow(
+    item: ReleaseUpdateUi,
+    onClick: () -> Unit,
+    onComplete: () -> Unit,
+    onSkip: () -> Unit,
+) {
+    val dismissState = rememberSwipeToDismissBoxState(
+        confirmValueChange = { value ->
+            when (value) {
+                SwipeToDismissBoxValue.EndToStart -> onComplete()
+                SwipeToDismissBoxValue.StartToEnd -> onSkip()
+                SwipeToDismissBoxValue.Settled -> return@rememberSwipeToDismissBoxState false
+            }
+            false
+        },
+    )
+
+    SwipeToDismissBox(
+        state = dismissState,
+        backgroundContent = { SwipeActionBackground(dismissState.targetValue) },
+    ) {
+        ReleaseUpdateRow(item = item, onClick = onClick)
+    }
+}
+
+@Composable
+private fun SwipeActionBackground(targetValue: SwipeToDismissBoxValue) {
+    val isCompleteAction = targetValue == SwipeToDismissBoxValue.EndToStart
+    val isSkipAction = targetValue == SwipeToDismissBoxValue.StartToEnd
+    val containerColor = when {
+        isCompleteAction -> MaterialTheme.colorScheme.primaryContainer
+        isSkipAction -> MaterialTheme.colorScheme.tertiaryContainer
+        else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
+    }
+    val contentColor = when {
+        isCompleteAction -> MaterialTheme.colorScheme.onPrimaryContainer
+        isSkipAction -> MaterialTheme.colorScheme.onTertiaryContainer
+        else -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
+    val alignment = if (isSkipAction) Alignment.CenterStart else Alignment.CenterEnd
+    val label = if (isSkipAction) "Skipped" else "Complete"
+
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        shape = RoundedCornerShape(8.dp),
+        color = containerColor,
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 18.dp),
+            contentAlignment = alignment,
+        ) {
+            Text(label, color = contentColor, style = MaterialTheme.typography.labelLarge)
         }
     }
 }
@@ -881,6 +954,12 @@ private fun RewardDebugCard(
     var readStreakDays by remember { mutableStateOf(state.readStreakDays.toString()) }
     var completeStreakWeeks by remember { mutableStateOf(state.completeStreakWeeks.toString()) }
     var completedTaskCount by remember { mutableStateOf(state.rewardCompletedTaskCount.toString()) }
+
+    LaunchedEffect(state.readStreakDays, state.completeStreakWeeks, state.rewardCompletedTaskCount) {
+        readStreakDays = state.readStreakDays.toString()
+        completeStreakWeeks = state.completeStreakWeeks.toString()
+        completedTaskCount = state.rewardCompletedTaskCount.toString()
+    }
 
     ElevatedCard(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {

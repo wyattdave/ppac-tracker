@@ -73,9 +73,12 @@ class ReleasePreferences(
     }
 
     fun setDebugRewardState(readStreakDays: Int, completeStreakWeeks: Int, completedTaskCount: Int) {
+        val debugDate = LocalDate.now().toString()
         prefs.edit()
             .putInt(DEBUG_READ_STREAK_DAYS_KEY, readStreakDays.coerceAtLeast(0))
+            .putString(DEBUG_READ_STREAK_DATE_KEY, debugDate)
             .putInt(DEBUG_COMPLETE_STREAK_WEEKS_KEY, completeStreakWeeks.coerceAtLeast(0))
+            .putString(DEBUG_COMPLETE_STREAK_DATE_KEY, debugDate)
             .putInt(DEBUG_COMPLETED_TASK_COUNT_KEY, completedTaskCount.coerceAtLeast(0))
             .apply()
         rewardPerformanceState.value = readRewardPerformance(syncLongest = true)
@@ -100,6 +103,18 @@ class ReleasePreferences(
         rewardPerformanceState.value = readRewardPerformance()
     }
 
+    fun markRewardBadgesAnnounced(names: Set<String>) {
+        if (names.isEmpty()) return
+
+        val announced = prefs.getStringSet(ANNOUNCED_REWARD_BADGES_KEY, emptySet()).orEmpty().toMutableSet()
+        if (announced.addAll(names)) {
+            prefs.edit()
+                .putStringSet(ANNOUNCED_REWARD_BADGES_KEY, announced)
+                .apply()
+            rewardPerformanceState.value = readRewardPerformance()
+        }
+    }
+
     private fun readSourceSettings(): List<ReleaseSourceSetting> {
         return sources.map { source ->
             ReleaseSourceSetting(
@@ -116,10 +131,10 @@ class ReleasePreferences(
         val readDates = readDateSet(READ_TASK_DATES_KEY)
         val completeDates = readDateSet(COMPLETE_TASK_DATES_KEY)
         val apiFailureDates = readDateSet(API_FAILURE_DATES_KEY)
-        val baseReadStreakDays = consecutiveDaysEndingOn(date, readDates, apiFailureDates)
+        val baseReadStreakDays = consecutiveDaysThroughCurrentOrPreviousDay(date, readDates, apiFailureDates)
         val baseCompleteStreakWeeks = consecutiveWeeksEndingThisOrLastWeek(date, completeDates, apiFailureDates)
-        val readStreakDays = maxOf(prefs.getOptionalInt(DEBUG_READ_STREAK_DAYS_KEY) ?: 0, baseReadStreakDays)
-        val completeStreakWeeks = maxOf(prefs.getOptionalInt(DEBUG_COMPLETE_STREAK_WEEKS_KEY) ?: 0, baseCompleteStreakWeeks)
+        val readStreakDays = maxOf(debugReadStreakDays(date, readDates, apiFailureDates) ?: 0, baseReadStreakDays)
+        val completeStreakWeeks = maxOf(debugCompleteStreakWeeks(date, completeDates, apiFailureDates) ?: 0, baseCompleteStreakWeeks)
         val longestReadStreakDays = maxOf(prefs.getInt(LONGEST_READ_STREAK_DAYS_KEY, 0), readStreakDays)
         val longestCompleteStreakWeeks = maxOf(prefs.getInt(LONGEST_COMPLETE_STREAK_WEEKS_KEY, 0), completeStreakWeeks)
 
@@ -138,6 +153,7 @@ class ReleasePreferences(
             completedTaskOverride = prefs.getOptionalInt(DEBUG_COMPLETED_TASK_COUNT_KEY),
             manuallyCompletedBadges = prefs.getStringSet(MANUAL_COMPLETED_BADGES_KEY, emptySet()).orEmpty(),
             manuallyOpenBadges = prefs.getStringSet(MANUAL_OPEN_BADGES_KEY, emptySet()).orEmpty(),
+            announcedRewardBadges = prefs.getStringSet(ANNOUNCED_REWARD_BADGES_KEY, emptySet()).orEmpty(),
         )
     }
 
@@ -170,6 +186,22 @@ class ReleasePreferences(
         }.toSet()
     }
 
+    private fun readStoredDate(key: String): LocalDate? {
+        return prefs.getString(key, null)?.let { raw ->
+            runCatching { LocalDate.parse(raw) }.getOrNull()
+        }
+    }
+
+    private fun consecutiveDaysThroughCurrentOrPreviousDay(
+        date: LocalDate,
+        readDates: Set<LocalDate>,
+        apiFailureDates: Set<LocalDate>,
+    ): Int {
+        val todayCount = consecutiveDaysEndingOn(date, readDates, apiFailureDates)
+        if (todayCount > 0) return todayCount
+        return consecutiveDaysEndingOn(date.minusDays(1), readDates, apiFailureDates)
+    }
+
     private fun consecutiveDaysEndingOn(
         date: LocalDate,
         readDates: Set<LocalDate>,
@@ -180,6 +212,30 @@ class ReleasePreferences(
         while (cursor.isSuccessfulReadDay(readDates, apiFailureDates)) {
             count += 1
             cursor = cursor.minusDays(1)
+        }
+        return count
+    }
+
+    private fun debugReadStreakDays(
+        date: LocalDate,
+        readDates: Set<LocalDate>,
+        apiFailureDates: Set<LocalDate>,
+    ): Int? {
+        val debugCount = prefs.getOptionalInt(DEBUG_READ_STREAK_DAYS_KEY) ?: return null
+        val debugDate = readStoredDate(DEBUG_READ_STREAK_DATE_KEY) ?: date
+        if (!date.isAfter(debugDate)) return debugCount
+
+        var count = debugCount
+        var cursor = debugDate.plusDays(1)
+        while (!cursor.isAfter(date)) {
+            if (cursor.isSuccessfulReadDay(readDates, apiFailureDates)) {
+                count += 1
+            } else if (cursor == date) {
+                return count
+            } else {
+                return null
+            }
+            cursor = cursor.plusDays(1)
         }
         return count
     }
@@ -199,6 +255,32 @@ class ReleasePreferences(
         while (completedWeeks.contains(cursor)) {
             count += 1
             cursor = cursor.minusWeeks(1)
+        }
+        return count
+    }
+
+    private fun debugCompleteStreakWeeks(
+        date: LocalDate,
+        completeDates: Set<LocalDate>,
+        apiFailureDates: Set<LocalDate>,
+    ): Int? {
+        val debugCount = prefs.getOptionalInt(DEBUG_COMPLETE_STREAK_WEEKS_KEY) ?: return null
+        val debugWeek = (readStoredDate(DEBUG_COMPLETE_STREAK_DATE_KEY) ?: date).weekStart()
+        val currentWeek = date.weekStart()
+        if (!currentWeek.isAfter(debugWeek)) return debugCount
+
+        val completedWeeks = (completeDates + apiFailureDates).map { it.weekStart() }.toSet()
+        var count = debugCount
+        var cursor = debugWeek.plusWeeks(1)
+        while (!cursor.isAfter(currentWeek)) {
+            if (completedWeeks.contains(cursor)) {
+                count += 1
+            } else if (cursor == currentWeek) {
+                return count
+            } else {
+                return null
+            }
+            cursor = cursor.plusWeeks(1)
         }
         return count
     }
@@ -232,10 +314,13 @@ class ReleasePreferences(
         const val LONGEST_READ_STREAK_DAYS_KEY = "longest_read_streak_days"
         const val LONGEST_COMPLETE_STREAK_WEEKS_KEY = "longest_complete_streak_weeks"
         const val DEBUG_READ_STREAK_DAYS_KEY = "debug_read_streak_days"
+        const val DEBUG_READ_STREAK_DATE_KEY = "debug_read_streak_date"
         const val DEBUG_COMPLETE_STREAK_WEEKS_KEY = "debug_complete_streak_weeks"
+        const val DEBUG_COMPLETE_STREAK_DATE_KEY = "debug_complete_streak_date"
         const val DEBUG_COMPLETED_TASK_COUNT_KEY = "debug_completed_task_count"
         const val MANUAL_COMPLETED_BADGES_KEY = "manual_completed_badges"
         const val MANUAL_OPEN_BADGES_KEY = "manual_open_badges"
+        const val ANNOUNCED_REWARD_BADGES_KEY = "announced_reward_badges"
     }
 }
 
@@ -260,6 +345,7 @@ data class RewardPerformance(
     val completedTaskOverride: Int?,
     val manuallyCompletedBadges: Set<String>,
     val manuallyOpenBadges: Set<String>,
+    val announcedRewardBadges: Set<String>,
 )
 
 data class NotificationSettings(
