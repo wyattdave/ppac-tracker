@@ -32,6 +32,7 @@ object ReleaseNotifications {
     }
 
     fun showSyncNotification(context: Context, metrics: ReleaseSummaryMetrics) {
+        ensureChannel(context)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             val granted = ContextCompat.checkSelfPermission(
                 context,
@@ -61,6 +62,8 @@ object ReleaseNotifications {
             .setAutoCancel(true)
             .build()
 
-        NotificationManagerCompat.from(context).notify(notificationId, notification)
+        runCatching {
+            NotificationManagerCompat.from(context).notify(notificationId, notification)
+        }
     }
 }

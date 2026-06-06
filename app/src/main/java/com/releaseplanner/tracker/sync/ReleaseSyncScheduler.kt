@@ -1,10 +1,11 @@
 package com.releaseplanner.tracker.sync
 
 import android.content.Context
+import androidx.work.BackoffPolicy
 import androidx.work.Constraints
-import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.ExistingWorkPolicy
 import androidx.work.NetworkType
-import androidx.work.PeriodicWorkRequestBuilder
+import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import com.releaseplanner.tracker.data.NotificationSettings
 import java.time.Duration
@@ -16,33 +17,38 @@ object ReleaseSyncScheduler {
     private const val workName = "release-planner-sync"
 
     fun schedule(context: Context, settings: NotificationSettings) {
-        enqueue(context, settings, ExistingPeriodicWorkPolicy.KEEP)
+        enqueue(context, settings, ExistingWorkPolicy.KEEP)
     }
 
     fun reschedule(context: Context, settings: NotificationSettings) {
-        enqueue(context, settings, ExistingPeriodicWorkPolicy.CANCEL_AND_REENQUEUE)
+        enqueue(context, settings, ExistingWorkPolicy.REPLACE)
+    }
+
+    fun scheduleNext(context: Context, settings: NotificationSettings) {
+        enqueue(context, settings, ExistingWorkPolicy.APPEND_OR_REPLACE)
     }
 
     private fun enqueue(
         context: Context,
         settings: NotificationSettings,
-        existingWorkPolicy: ExistingPeriodicWorkPolicy,
+        existingWorkPolicy: ExistingWorkPolicy,
     ) {
         if (!settings.enabled) {
             cancel(context)
             return
         }
 
-        val request = PeriodicWorkRequestBuilder<ReleaseSyncWorker>(24, TimeUnit.HOURS)
+        val request = OneTimeWorkRequestBuilder<ReleaseSyncWorker>()
             .setConstraints(
                 Constraints.Builder()
                     .setRequiredNetworkType(NetworkType.CONNECTED)
                     .build(),
             )
             .setInitialDelay(initialDelayMinutes(settings), TimeUnit.MINUTES)
+            .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.MINUTES)
             .build()
 
-        WorkManager.getInstance(context).enqueueUniquePeriodicWork(
+        WorkManager.getInstance(context).enqueueUniqueWork(
             workName,
             existingWorkPolicy,
             request,

@@ -197,9 +197,7 @@ class ReleasePreferences(
         readDates: Set<LocalDate>,
         apiFailureDates: Set<LocalDate>,
     ): Int {
-        val todayCount = consecutiveDaysEndingOn(date, readDates, apiFailureDates)
-        if (todayCount > 0) return todayCount
-        return consecutiveDaysEndingOn(date.minusDays(1), readDates, apiFailureDates)
+        return consecutiveDaysEndingOn(date, readDates, apiFailureDates)
     }
 
     private fun consecutiveDaysEndingOn(
@@ -230,8 +228,6 @@ class ReleasePreferences(
         while (!cursor.isAfter(date)) {
             if (cursor.isSuccessfulReadDay(readDates, apiFailureDates)) {
                 count += 1
-            } else if (cursor == date) {
-                return count
             } else {
                 return null
             }
@@ -247,9 +243,7 @@ class ReleasePreferences(
     ): Int {
         val completedWeeks = (completeDates + apiFailureDates).map { it.weekStart() }.toSet()
         var cursor = date.weekStart()
-        if (!completedWeeks.contains(cursor)) {
-            cursor = cursor.minusWeeks(1)
-        }
+        if (!completedWeeks.contains(cursor)) return 0
 
         var count = 0
         while (completedWeeks.contains(cursor)) {
@@ -275,8 +269,6 @@ class ReleasePreferences(
         while (!cursor.isAfter(currentWeek)) {
             if (completedWeeks.contains(cursor)) {
                 count += 1
-            } else if (cursor == currentWeek) {
-                return count
             } else {
                 return null
             }

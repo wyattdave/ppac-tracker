@@ -67,6 +67,7 @@ import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -384,12 +385,14 @@ private fun UpdatesScreen(
                 item { EmptyState("No updates match these filters.") }
             } else {
                 items(state.filteredUpdates, key = { it.update.id }) { item ->
-                    SwipeableReleaseUpdateRow(
-                        item = item,
-                        onClick = { viewModel.selectUpdate(item.update.id) },
-                        onComplete = { viewModel.setTaskStatus(item.update.id, TaskStatus.Complete) },
-                        onSkip = { viewModel.setTaskStatus(item.update.id, TaskStatus.Skipped) },
-                    )
+                    key(item.update.id, item.taskStatus, state.statusFilter, state.searchQuery, state.releaseStageFilter, state.selectedProduct) {
+                        SwipeableReleaseUpdateRow(
+                            item = item,
+                            onClick = { viewModel.selectUpdate(item.update.id) },
+                            onComplete = { viewModel.setTaskStatus(item.update.id, TaskStatus.Complete) },
+                            onSkip = { viewModel.setTaskStatus(item.update.id, TaskStatus.Skipped) },
+                        )
+                    }
                 }
             }
         }
@@ -405,6 +408,7 @@ private fun SwipeableReleaseUpdateRow(
     onSkip: () -> Unit,
 ) {
     val dismissState = rememberSwipeToDismissBoxState(
+        positionalThreshold = { distance -> distance * 0.25f },
         confirmValueChange = { value ->
             when (value) {
                 SwipeToDismissBoxValue.EndToStart -> onComplete()
@@ -570,7 +574,7 @@ private fun TimelineScreen(state: ReleaseTrackerUiState, viewModel: ReleaseTrack
 
 @Composable
 private fun TrackedScreen(state: ReleaseTrackerUiState, viewModel: ReleaseTrackerViewModel) {
-    val tracked = state.visibleUpdates.filter { it.isSaved || it.isComplete || it.isSkipped }
+    val tracked = state.visibleUpdates.filter { it.isSaved }
     LazyColumn(
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -583,7 +587,7 @@ private fun TrackedScreen(state: ReleaseTrackerUiState, viewModel: ReleaseTracke
             }
         }
         if (tracked.isEmpty()) {
-            item { EmptyState("Save or complete updates to build your local tracker.") }
+            item { EmptyState("Save updates to build your local tracker.") }
         } else {
             items(tracked, key = { it.update.id }) { item ->
                 ReleaseUpdateRow(item = item, onClick = { viewModel.selectUpdate(item.update.id) })
