@@ -72,13 +72,18 @@ class ReleasePreferences(
         rewardPerformanceState.value = readRewardPerformance(syncLongest = true, date = date)
     }
 
-    fun setDebugRewardState(readStreakDays: Int, completeStreakWeeks: Int, completedTaskCount: Int) {
-        val debugDate = LocalDate.now().toString()
+    fun setDebugRewardState(
+        readStreakDays: Int,
+        readStreakStartDate: LocalDate,
+        completeStreakWeeks: Int,
+        completeStreakStartDate: LocalDate,
+        completedTaskCount: Int,
+    ) {
         prefs.edit()
             .putInt(DEBUG_READ_STREAK_DAYS_KEY, readStreakDays.coerceAtLeast(0))
-            .putString(DEBUG_READ_STREAK_DATE_KEY, debugDate)
+            .putString(DEBUG_READ_STREAK_DATE_KEY, readStreakStartDate.toString())
             .putInt(DEBUG_COMPLETE_STREAK_WEEKS_KEY, completeStreakWeeks.coerceAtLeast(0))
-            .putString(DEBUG_COMPLETE_STREAK_DATE_KEY, debugDate)
+            .putString(DEBUG_COMPLETE_STREAK_DATE_KEY, completeStreakStartDate.toString())
             .putInt(DEBUG_COMPLETED_TASK_COUNT_KEY, completedTaskCount.coerceAtLeast(0))
             .apply()
         rewardPerformanceState.value = readRewardPerformance(syncLongest = true)
@@ -133,23 +138,43 @@ class ReleasePreferences(
         val apiFailureDates = readDateSet(API_FAILURE_DATES_KEY)
         val baseReadStreakDays = consecutiveDaysThroughCurrentOrPreviousDay(date, readDates, apiFailureDates)
         val baseCompleteStreakWeeks = consecutiveWeeksEndingThisOrLastWeek(date, completeDates, apiFailureDates)
-        val readStreakDays = maxOf(debugReadStreakDays(date, readDates, apiFailureDates) ?: 0, baseReadStreakDays)
-        val completeStreakWeeks = maxOf(debugCompleteStreakWeeks(date, completeDates, apiFailureDates) ?: 0, baseCompleteStreakWeeks)
-        val longestReadStreakDays = maxOf(prefs.getInt(LONGEST_READ_STREAK_DAYS_KEY, 0), readStreakDays)
-        val longestCompleteStreakWeeks = maxOf(prefs.getInt(LONGEST_COMPLETE_STREAK_WEEKS_KEY, 0), completeStreakWeeks)
+        val baseReadStreak = RewardStreak(
+            count = baseReadStreakDays,
+            startDate = date.minusDays((baseReadStreakDays - 1).toLong()).takeIf { baseReadStreakDays > 0 },
+        )
+        val baseCompleteStreak = RewardStreak(
+            count = baseCompleteStreakWeeks,
+            startDate = date.weekStart().minusWeeks((baseCompleteStreakWeeks - 1).toLong()).takeIf { baseCompleteStreakWeeks > 0 },
+        )
+        val readStreak = maxStreak(debugReadStreak(date, readDates, apiFailureDates), baseReadStreak)
+        val completeStreak = maxStreak(debugCompleteStreak(date, completeDates, apiFailureDates), baseCompleteStreak)
+        val storedLongestReadStreakDays = prefs.getInt(LONGEST_READ_STREAK_DAYS_KEY, 0)
+        val storedLongestCompleteStreakWeeks = prefs.getInt(LONGEST_COMPLETE_STREAK_WEEKS_KEY, 0)
+        val storedLongestReadStartDate = readStoredDate(LONGEST_READ_STREAK_START_DATE_KEY)
+        val storedLongestCompleteStartDate = readStoredDate(LONGEST_COMPLETE_STREAK_START_DATE_KEY)
+        val longestReadStreak = if (readStreak.count >= storedLongestReadStreakDays) readStreak else RewardStreak(storedLongestReadStreakDays, storedLongestReadStartDate)
+        val longestCompleteStreak = if (completeStreak.count >= storedLongestCompleteStreakWeeks) completeStreak else RewardStreak(storedLongestCompleteStreakWeeks, storedLongestCompleteStartDate)
 
         if (syncLongest) {
-            prefs.edit()
-                .putInt(LONGEST_READ_STREAK_DAYS_KEY, longestReadStreakDays)
-                .putInt(LONGEST_COMPLETE_STREAK_WEEKS_KEY, longestCompleteStreakWeeks)
-                .apply()
+            prefs.edit().apply {
+                putInt(LONGEST_READ_STREAK_DAYS_KEY, longestReadStreak.count)
+                putInt(LONGEST_COMPLETE_STREAK_WEEKS_KEY, longestCompleteStreak.count)
+                longestReadStreak.startDate?.let { putString(LONGEST_READ_STREAK_START_DATE_KEY, it.toString()) }
+                longestCompleteStreak.startDate?.let { putString(LONGEST_COMPLETE_STREAK_START_DATE_KEY, it.toString()) }
+            }.apply()
         }
 
         return RewardPerformance(
-            readStreakDays = readStreakDays,
-            completeStreakWeeks = completeStreakWeeks,
-            longestReadStreakDays = longestReadStreakDays,
-            longestCompleteStreakWeeks = longestCompleteStreakWeeks,
+            readStreakDays = readStreak.count,
+            completeStreakWeeks = completeStreak.count,
+            longestReadStreakDays = longestReadStreak.count,
+            longestCompleteStreakWeeks = longestCompleteStreak.count,
+            readStreakStartDate = readStreak.startDate,
+            completeStreakStartDate = completeStreak.startDate,
+            longestReadStreakStartDate = longestReadStreak.startDate,
+            longestCompleteStreakStartDate = longestCompleteStreak.startDate,
+            debugReadStreakStartDate = readStoredDate(DEBUG_READ_STREAK_DATE_KEY),
+            debugCompleteStreakStartDate = readStoredDate(DEBUG_COMPLETE_STREAK_DATE_KEY),
             completedTaskOverride = prefs.getOptionalInt(DEBUG_COMPLETED_TASK_COUNT_KEY),
             manuallyCompletedBadges = prefs.getStringSet(MANUAL_COMPLETED_BADGES_KEY, emptySet()).orEmpty(),
             manuallyOpenBadges = prefs.getStringSet(MANUAL_OPEN_BADGES_KEY, emptySet()).orEmpty(),
@@ -214,17 +239,22 @@ class ReleasePreferences(
         return count
     }
 
-    private fun debugReadStreakDays(
+    private fun maxStreak(first: RewardStreak?, second: RewardStreak): RewardStreak {
+        return if ((first?.count ?: 0) > second.count) first!! else second
+    }
+
+    private fun debugReadStreak(
         date: LocalDate,
         readDates: Set<LocalDate>,
         apiFailureDates: Set<LocalDate>,
-    ): Int? {
+    ): RewardStreak? {
         val debugCount = prefs.getOptionalInt(DEBUG_READ_STREAK_DAYS_KEY) ?: return null
-        val debugDate = readStoredDate(DEBUG_READ_STREAK_DATE_KEY) ?: date
-        if (!date.isAfter(debugDate)) return debugCount
+        val startDate = readStoredDate(DEBUG_READ_STREAK_DATE_KEY) ?: date.minusDays((debugCount - 1).toLong())
+        val endDate = startDate.plusDays((debugCount.coerceAtLeast(1) - 1).toLong())
+        if (!date.isAfter(endDate)) return RewardStreak(debugCount, startDate.takeIf { debugCount > 0 })
 
         var count = debugCount
-        var cursor = debugDate.plusDays(1)
+        var cursor = endDate.plusDays(1)
         while (!cursor.isAfter(date)) {
             if (cursor.isSuccessfulReadDay(readDates, apiFailureDates)) {
                 count += 1
@@ -233,7 +263,7 @@ class ReleasePreferences(
             }
             cursor = cursor.plusDays(1)
         }
-        return count
+        return RewardStreak(count, startDate.takeIf { count > 0 })
     }
 
     private fun consecutiveWeeksEndingThisOrLastWeek(
@@ -253,15 +283,17 @@ class ReleasePreferences(
         return count
     }
 
-    private fun debugCompleteStreakWeeks(
+    private fun debugCompleteStreak(
         date: LocalDate,
         completeDates: Set<LocalDate>,
         apiFailureDates: Set<LocalDate>,
-    ): Int? {
+    ): RewardStreak? {
         val debugCount = prefs.getOptionalInt(DEBUG_COMPLETE_STREAK_WEEKS_KEY) ?: return null
-        val debugWeek = (readStoredDate(DEBUG_COMPLETE_STREAK_DATE_KEY) ?: date).weekStart()
+        val startDate = readStoredDate(DEBUG_COMPLETE_STREAK_DATE_KEY) ?: date.weekStart().minusWeeks((debugCount - 1).toLong())
+        val startWeek = startDate.weekStart()
+        val debugWeek = startWeek.plusWeeks((debugCount.coerceAtLeast(1) - 1).toLong())
         val currentWeek = date.weekStart()
-        if (!currentWeek.isAfter(debugWeek)) return debugCount
+        if (!currentWeek.isAfter(debugWeek)) return RewardStreak(debugCount, startDate.takeIf { debugCount > 0 })
 
         val completedWeeks = (completeDates + apiFailureDates).map { it.weekStart() }.toSet()
         var count = debugCount
@@ -274,7 +306,7 @@ class ReleasePreferences(
             }
             cursor = cursor.plusWeeks(1)
         }
-        return count
+        return RewardStreak(count, startDate.takeIf { count > 0 })
     }
 
     private fun LocalDate.weekStart(): LocalDate {
@@ -304,7 +336,9 @@ class ReleasePreferences(
         const val NOTIFICATION_HOUR_KEY = "notification_hour"
         const val NOTIFICATION_MINUTE_KEY = "notification_minute"
         const val LONGEST_READ_STREAK_DAYS_KEY = "longest_read_streak_days"
+        const val LONGEST_READ_STREAK_START_DATE_KEY = "longest_read_streak_start_date"
         const val LONGEST_COMPLETE_STREAK_WEEKS_KEY = "longest_complete_streak_weeks"
+        const val LONGEST_COMPLETE_STREAK_START_DATE_KEY = "longest_complete_streak_start_date"
         const val DEBUG_READ_STREAK_DAYS_KEY = "debug_read_streak_days"
         const val DEBUG_READ_STREAK_DATE_KEY = "debug_read_streak_date"
         const val DEBUG_COMPLETE_STREAK_WEEKS_KEY = "debug_complete_streak_weeks"
@@ -315,6 +349,11 @@ class ReleasePreferences(
         const val ANNOUNCED_REWARD_BADGES_KEY = "announced_reward_badges"
     }
 }
+
+private data class RewardStreak(
+    val count: Int,
+    val startDate: LocalDate?,
+)
 
 enum class ReleaseThemeMode(val label: String) {
     Light("Light"),
@@ -334,6 +373,12 @@ data class RewardPerformance(
     val completeStreakWeeks: Int,
     val longestReadStreakDays: Int,
     val longestCompleteStreakWeeks: Int,
+    val readStreakStartDate: LocalDate?,
+    val completeStreakStartDate: LocalDate?,
+    val longestReadStreakStartDate: LocalDate?,
+    val longestCompleteStreakStartDate: LocalDate?,
+    val debugReadStreakStartDate: LocalDate?,
+    val debugCompleteStreakStartDate: LocalDate?,
     val completedTaskOverride: Int?,
     val manuallyCompletedBadges: Set<String>,
     val manuallyOpenBadges: Set<String>,

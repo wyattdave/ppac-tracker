@@ -171,6 +171,12 @@ class ReleaseTrackerViewModel(application: Application) : AndroidViewModel(appli
             completeStreakWeeks = preferenceState.rewardPerformance.completeStreakWeeks,
             longestReadStreakDays = preferenceState.rewardPerformance.longestReadStreakDays,
             longestCompleteStreakWeeks = preferenceState.rewardPerformance.longestCompleteStreakWeeks,
+            readStreakStartDate = preferenceState.rewardPerformance.readStreakStartDate,
+            completeStreakStartDate = preferenceState.rewardPerformance.completeStreakStartDate,
+            longestReadStreakStartDate = preferenceState.rewardPerformance.longestReadStreakStartDate,
+            longestCompleteStreakStartDate = preferenceState.rewardPerformance.longestCompleteStreakStartDate,
+            debugReadStreakStartDate = preferenceState.rewardPerformance.debugReadStreakStartDate,
+            debugCompleteStreakStartDate = preferenceState.rewardPerformance.debugCompleteStreakStartDate,
             rewardCompletedTaskCount = completedTaskCount,
             announcedRewardBadgeNames = preferenceState.rewardPerformance.announcedRewardBadges,
             isRefreshing = meta.isRefreshing,
@@ -333,8 +339,20 @@ class ReleaseTrackerViewModel(application: Application) : AndroidViewModel(appli
         }
     }
 
-    fun setDebugRewardState(readStreakDays: Int, completeStreakWeeks: Int, completedTaskCount: Int) {
-        preferences.setDebugRewardState(readStreakDays, completeStreakWeeks, completedTaskCount)
+    fun setDebugRewardState(
+        readStreakDays: Int,
+        readStreakStartDate: LocalDate,
+        completeStreakWeeks: Int,
+        completeStreakStartDate: LocalDate,
+        completedTaskCount: Int,
+    ) {
+        preferences.setDebugRewardState(
+            readStreakDays,
+            readStreakStartDate,
+            completeStreakWeeks,
+            completeStreakStartDate,
+            completedTaskCount,
+        )
     }
 
     fun toggleBadgeReceived(name: String, isCurrentlyComplete: Boolean) {

@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.BitmapFactory
 import android.text.Html
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
@@ -767,18 +768,41 @@ private fun BadgeTile(
 
 @Composable
 private fun RewardProgressSection(state: ReleaseTrackerUiState) {
+    val context = LocalContext.current
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         SectionTitle("Rewards")
         RewardProgressCard(state.rewardProgress)
-        LongestRewardStats(state.longestReadStreakDays, state.longestCompleteStreakWeeks)
+        LongestRewardStats(
+            longestReadStreakDays = state.longestReadStreakDays,
+            longestReadStreakStartDate = state.longestReadStreakStartDate,
+            longestCompleteStreakWeeks = state.longestCompleteStreakWeeks,
+            longestCompleteStreakStartDate = state.longestCompleteStreakStartDate,
+            onShowMessage = { message -> Toast.makeText(context, message, Toast.LENGTH_SHORT).show() },
+        )
     }
 }
 
 @Composable
-private fun LongestRewardStats(longestReadStreakDays: Int, longestCompleteStreakWeeks: Int) {
+private fun LongestRewardStats(
+    longestReadStreakDays: Int,
+    longestReadStreakStartDate: LocalDate?,
+    longestCompleteStreakWeeks: Int,
+    longestCompleteStreakStartDate: LocalDate?,
+    onShowMessage: (String) -> Unit,
+) {
     Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-        MetricCard("Longest streak", "$longestReadStreakDays days", Modifier.weight(1f))
-        MetricCard("Longest complete", "$longestCompleteStreakWeeks weeks", Modifier.weight(1f))
+        MetricCard(
+            label = "Longest streak",
+            value = "$longestReadStreakDays days",
+            modifier = Modifier.weight(1f),
+            onClick = { onShowMessage(longestReadStreakStartDate.toStreakStartMessage()) },
+        )
+        MetricCard(
+            label = "Longest complete",
+            value = "$longestCompleteStreakWeeks weeks",
+            modifier = Modifier.weight(1f),
+            onClick = { onShowMessage(longestCompleteStreakStartDate.toStreakStartMessage()) },
+        )
     }
 }
 
@@ -953,16 +977,29 @@ private fun LinkListItem(text: String, onClick: () -> Unit) {
 @Composable
 private fun RewardDebugCard(
     state: ReleaseTrackerUiState,
-    onApply: (Int, Int, Int) -> Unit,
+    onApply: (Int, LocalDate, Int, LocalDate, Int) -> Unit,
 ) {
     var readStreakDays by remember { mutableStateOf(state.readStreakDays.toString()) }
     var completeStreakWeeks by remember { mutableStateOf(state.completeStreakWeeks.toString()) }
     var completedTaskCount by remember { mutableStateOf(state.rewardCompletedTaskCount.toString()) }
+    var readStreakStartDate by remember { mutableStateOf(state.debugReadStreakStartDate ?: state.readStreakStartDate ?: LocalDate.now()) }
+    var completeStreakStartDate by remember { mutableStateOf(state.debugCompleteStreakStartDate ?: state.completeStreakStartDate ?: LocalDate.now().weekStart()) }
+    var activeDatePicker by remember { mutableStateOf<DebugDatePickerTarget?>(null) }
 
-    LaunchedEffect(state.readStreakDays, state.completeStreakWeeks, state.rewardCompletedTaskCount) {
+    LaunchedEffect(
+        state.readStreakDays,
+        state.completeStreakWeeks,
+        state.rewardCompletedTaskCount,
+        state.debugReadStreakStartDate,
+        state.debugCompleteStreakStartDate,
+        state.readStreakStartDate,
+        state.completeStreakStartDate,
+    ) {
         readStreakDays = state.readStreakDays.toString()
         completeStreakWeeks = state.completeStreakWeeks.toString()
         completedTaskCount = state.rewardCompletedTaskCount.toString()
+        readStreakStartDate = state.debugReadStreakStartDate ?: state.readStreakStartDate ?: LocalDate.now()
+        completeStreakStartDate = state.debugCompleteStreakStartDate ?: state.completeStreakStartDate ?: LocalDate.now().weekStart()
     }
 
     ElevatedCard(modifier = Modifier.fillMaxWidth()) {
@@ -975,12 +1012,22 @@ private fun RewardDebugCard(
                 singleLine = true,
                 label = { Text("Days read streak") },
             )
+            DatePickerButton(
+                label = "Read streak start",
+                date = readStreakStartDate,
+                onClick = { activeDatePicker = DebugDatePickerTarget.ReadStreak },
+            )
             OutlinedTextField(
                 value = completeStreakWeeks,
                 onValueChange = { completeStreakWeeks = it.filter(Char::isDigit) },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
                 label = { Text("Weeks complete streak") },
+            )
+            DatePickerButton(
+                label = "Complete streak start",
+                date = completeStreakStartDate,
+                onClick = { activeDatePicker = DebugDatePickerTarget.CompleteStreak },
             )
             OutlinedTextField(
                 value = completedTaskCount,
@@ -993,7 +1040,9 @@ private fun RewardDebugCard(
                 onClick = {
                     onApply(
                         readStreakDays.toIntOrNull() ?: 0,
+                        readStreakStartDate,
                         completeStreakWeeks.toIntOrNull() ?: 0,
+                        completeStreakStartDate,
                         completedTaskCount.toIntOrNull() ?: 0,
                     )
                 },
@@ -1006,6 +1055,58 @@ private fun RewardDebugCard(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
+    }
+
+    activeDatePicker?.let { target ->
+        DebugRewardDatePickerDialog(
+            target = target,
+            initialDate = when (target) {
+                DebugDatePickerTarget.ReadStreak -> readStreakStartDate
+                DebugDatePickerTarget.CompleteStreak -> completeStreakStartDate
+            },
+            onDismiss = { activeDatePicker = null },
+            onDateSelected = { selectedDate ->
+                when (target) {
+                    DebugDatePickerTarget.ReadStreak -> readStreakStartDate = selectedDate
+                    DebugDatePickerTarget.CompleteStreak -> completeStreakStartDate = selectedDate
+                }
+                activeDatePicker = null
+            },
+        )
+    }
+}
+
+@Composable
+private fun DatePickerButton(label: String, date: LocalDate, onClick: () -> Unit) {
+    OutlinedButton(onClick = onClick, modifier = Modifier.fillMaxWidth()) {
+        Text("$label: ${date.toDisplayDate()}")
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun DebugRewardDatePickerDialog(
+    target: DebugDatePickerTarget,
+    initialDate: LocalDate,
+    onDismiss: () -> Unit,
+    onDateSelected: (LocalDate) -> Unit,
+) {
+    val datePickerState = rememberDatePickerState(initialSelectedDateMillis = initialDate.toPickerMillis())
+    DatePickerDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            TextButton(
+                onClick = { datePickerState.selectedDateMillis?.toLocalDate()?.let(onDateSelected) ?: onDismiss() },
+            ) { Text("Apply") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        },
+    ) {
+        DatePicker(
+            state = datePickerState,
+            title = { Text(target.title, modifier = Modifier.padding(start = 24.dp, top = 18.dp, end = 24.dp)) },
+        )
     }
 }
 
@@ -1603,8 +1704,12 @@ private fun ReleaseStageFilterRow(selected: String, onSelected: (String) -> Unit
 }
 
 @Composable
-private fun MetricCard(label: String, value: String, modifier: Modifier = Modifier) {
-    ElevatedCard(modifier = modifier.height(96.dp)) {
+private fun MetricCard(label: String, value: String, modifier: Modifier = Modifier, onClick: (() -> Unit)? = null) {
+    ElevatedCard(
+        modifier = modifier
+            .height(96.dp)
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
+    ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -1615,6 +1720,17 @@ private fun MetricCard(label: String, value: String, modifier: Modifier = Modifi
             Text(value, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
         }
     }
+}
+
+private fun LocalDate.weekStart(): LocalDate = minusDays((dayOfWeek.value - 1).toLong())
+
+private fun LocalDate?.toStreakStartMessage(): String {
+    return this?.let { "Streak started ${it.toDisplayDate()}" } ?: "Streak start date is not available yet"
+}
+
+private enum class DebugDatePickerTarget(val title: String) {
+    ReadStreak("Read streak start date"),
+    CompleteStreak("Complete streak start date"),
 }
 
 @Composable
