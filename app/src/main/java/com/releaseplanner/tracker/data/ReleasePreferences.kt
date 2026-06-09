@@ -5,6 +5,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import java.time.DayOfWeek
 import java.time.LocalDate
+import java.time.temporal.ChronoUnit
 
 class ReleasePreferences(
     context: Context,
@@ -136,18 +137,10 @@ class ReleasePreferences(
         val readDates = readDateSet(READ_TASK_DATES_KEY)
         val completeDates = readDateSet(COMPLETE_TASK_DATES_KEY)
         val apiFailureDates = readDateSet(API_FAILURE_DATES_KEY)
-        val baseReadStreakDays = consecutiveDaysThroughCurrentOrPreviousDay(date, readDates, apiFailureDates)
-        val baseCompleteStreakWeeks = consecutiveWeeksEndingThisOrLastWeek(date, completeDates, apiFailureDates)
-        val baseReadStreak = RewardStreak(
-            count = baseReadStreakDays,
-            startDate = date.minusDays((baseReadStreakDays - 1).toLong()).takeIf { baseReadStreakDays > 0 },
-        )
-        val baseCompleteStreak = RewardStreak(
-            count = baseCompleteStreakWeeks,
-            startDate = date.weekStart().minusWeeks((baseCompleteStreakWeeks - 1).toLong()).takeIf { baseCompleteStreakWeeks > 0 },
-        )
-        val readStreak = maxStreak(debugReadStreak(date, readDates, apiFailureDates), baseReadStreak)
-        val completeStreak = maxStreak(debugCompleteStreak(date, completeDates, apiFailureDates), baseCompleteStreak)
+        val baseReadStreak = currentReadStreak(date, readDates, apiFailureDates)
+        val baseCompleteStreak = currentCompleteStreak(date, completeDates, apiFailureDates)
+        val readStreak = debugReadStreak(date) ?: baseReadStreak
+        val completeStreak = debugCompleteStreak(date) ?: baseCompleteStreak
         val storedLongestReadStreakDays = prefs.getInt(LONGEST_READ_STREAK_DAYS_KEY, 0)
         val storedLongestCompleteStreakWeeks = prefs.getInt(LONGEST_COMPLETE_STREAK_WEEKS_KEY, 0)
         val storedLongestReadStartDate = readStoredDate(LONGEST_READ_STREAK_START_DATE_KEY)
@@ -217,12 +210,17 @@ class ReleasePreferences(
         }
     }
 
-    private fun consecutiveDaysThroughCurrentOrPreviousDay(
+    private fun currentReadStreak(
         date: LocalDate,
         readDates: Set<LocalDate>,
         apiFailureDates: Set<LocalDate>,
-    ): Int {
-        return consecutiveDaysEndingOn(date, readDates, apiFailureDates)
+    ): RewardStreak {
+        val endDate = if (date.isSuccessfulReadDay(readDates, apiFailureDates)) date else date.minusDays(1)
+        val count = consecutiveDaysEndingOn(endDate, readDates, apiFailureDates)
+        return RewardStreak(
+            count = count,
+            startDate = endDate.minusDays((count - 1).toLong()).takeIf { count > 0 },
+        )
     }
 
     private fun consecutiveDaysEndingOn(
@@ -239,74 +237,51 @@ class ReleasePreferences(
         return count
     }
 
-    private fun maxStreak(first: RewardStreak?, second: RewardStreak): RewardStreak {
-        return if ((first?.count ?: 0) > second.count) first!! else second
-    }
-
-    private fun debugReadStreak(
-        date: LocalDate,
-        readDates: Set<LocalDate>,
-        apiFailureDates: Set<LocalDate>,
-    ): RewardStreak? {
+    private fun debugReadStreak(date: LocalDate): RewardStreak? {
         val debugCount = prefs.getOptionalInt(DEBUG_READ_STREAK_DAYS_KEY) ?: return null
         val startDate = readStoredDate(DEBUG_READ_STREAK_DATE_KEY) ?: date.minusDays((debugCount - 1).toLong())
-        val endDate = startDate.plusDays((debugCount.coerceAtLeast(1) - 1).toLong())
-        if (!date.isAfter(endDate)) return RewardStreak(debugCount, startDate.takeIf { debugCount > 0 })
-
-        var count = debugCount
-        var cursor = endDate.plusDays(1)
-        while (!cursor.isAfter(date)) {
-            if (cursor.isSuccessfulReadDay(readDates, apiFailureDates)) {
-                count += 1
-            } else {
-                return null
-            }
-            cursor = cursor.plusDays(1)
+        if (debugCount <= 0 || startDate.isAfter(date)) {
+            return RewardStreak(0, null)
         }
-        return RewardStreak(count, startDate.takeIf { count > 0 })
+        return RewardStreak(
+            count = ChronoUnit.DAYS.between(startDate, date).toInt() + 1,
+            startDate = startDate,
+        )
     }
 
-    private fun consecutiveWeeksEndingThisOrLastWeek(
+    private fun currentCompleteStreak(
         date: LocalDate,
         completeDates: Set<LocalDate>,
         apiFailureDates: Set<LocalDate>,
-    ): Int {
+    ): RewardStreak {
         val completedWeeks = (completeDates + apiFailureDates).map { it.weekStart() }.toSet()
-        var cursor = date.weekStart()
-        if (!completedWeeks.contains(cursor)) return 0
+        val currentWeek = date.weekStart()
+        val endWeek = if (completedWeeks.contains(currentWeek)) currentWeek else currentWeek.minusWeeks(1)
 
         var count = 0
+        var cursor = endWeek
         while (completedWeeks.contains(cursor)) {
             count += 1
             cursor = cursor.minusWeeks(1)
         }
-        return count
+        return RewardStreak(
+            count = count,
+            startDate = endWeek.minusWeeks((count - 1).toLong()).takeIf { count > 0 },
+        )
     }
 
-    private fun debugCompleteStreak(
-        date: LocalDate,
-        completeDates: Set<LocalDate>,
-        apiFailureDates: Set<LocalDate>,
-    ): RewardStreak? {
+    private fun debugCompleteStreak(date: LocalDate): RewardStreak? {
         val debugCount = prefs.getOptionalInt(DEBUG_COMPLETE_STREAK_WEEKS_KEY) ?: return null
         val startDate = readStoredDate(DEBUG_COMPLETE_STREAK_DATE_KEY) ?: date.weekStart().minusWeeks((debugCount - 1).toLong())
         val startWeek = startDate.weekStart()
-        val debugWeek = startWeek.plusWeeks((debugCount.coerceAtLeast(1) - 1).toLong())
         val currentWeek = date.weekStart()
-        if (!currentWeek.isAfter(debugWeek)) return RewardStreak(debugCount, startDate.takeIf { debugCount > 0 })
-
-        val completedWeeks = (completeDates + apiFailureDates).map { it.weekStart() }.toSet()
-        var count = debugCount
-        var cursor = debugWeek.plusWeeks(1)
-        while (!cursor.isAfter(currentWeek)) {
-            if (completedWeeks.contains(cursor)) {
-                count += 1
-            } else {
-                return null
-            }
-            cursor = cursor.plusWeeks(1)
+        if (debugCount <= 0 || startWeek.isAfter(currentWeek)) {
+            return RewardStreak(0, null)
         }
-        return RewardStreak(count, startDate.takeIf { count > 0 })
+        return RewardStreak(
+            count = ChronoUnit.WEEKS.between(startWeek, currentWeek).toInt() + 1,
+            startDate = startDate,
+        )
     }
 
     private fun LocalDate.weekStart(): LocalDate {

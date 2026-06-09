@@ -97,6 +97,7 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.TextStyle
+import java.time.temporal.ChronoUnit
 import java.util.Locale
 
 private val statusFilters = listOf(
@@ -833,6 +834,7 @@ private fun RewardProgressCard(progress: List<RewardProgressUi>) {
                         modifier = Modifier.size(circleSize * (1f - index * 0.22f)),
                         color = colors[index % colors.size],
                         strokeWidth = (10 - index * 2).dp,
+                        trackColor = colors[index % colors.size].copy(alpha = 0.14f),
                     )
                 }
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -1007,7 +1009,10 @@ private fun RewardDebugCard(
             Text("Debug rewards", style = MaterialTheme.typography.titleMedium)
             OutlinedTextField(
                 value = readStreakDays,
-                onValueChange = { readStreakDays = it.filter(Char::isDigit) },
+                onValueChange = { value ->
+                    readStreakDays = value.filter(Char::isDigit)
+                    readStreakStartDate = readStreakStartDateFor(readStreakDays.toIntOrNull() ?: 0)
+                },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
                 label = { Text("Days read streak") },
@@ -1019,7 +1024,10 @@ private fun RewardDebugCard(
             )
             OutlinedTextField(
                 value = completeStreakWeeks,
-                onValueChange = { completeStreakWeeks = it.filter(Char::isDigit) },
+                onValueChange = { value ->
+                    completeStreakWeeks = value.filter(Char::isDigit)
+                    completeStreakStartDate = completeStreakStartDateFor(completeStreakWeeks.toIntOrNull() ?: 0)
+                },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
                 label = { Text("Weeks complete streak") },
@@ -1067,8 +1075,14 @@ private fun RewardDebugCard(
             onDismiss = { activeDatePicker = null },
             onDateSelected = { selectedDate ->
                 when (target) {
-                    DebugDatePickerTarget.ReadStreak -> readStreakStartDate = selectedDate
-                    DebugDatePickerTarget.CompleteStreak -> completeStreakStartDate = selectedDate
+                    DebugDatePickerTarget.ReadStreak -> {
+                        readStreakStartDate = selectedDate
+                        readStreakDays = selectedDate.readStreakDaysThroughToday().toString()
+                    }
+                    DebugDatePickerTarget.CompleteStreak -> {
+                        completeStreakStartDate = selectedDate
+                        completeStreakWeeks = selectedDate.completeStreakWeeksThroughThisWeek().toString()
+                    }
                 }
                 activeDatePicker = null
             },
@@ -1723,6 +1737,26 @@ private fun MetricCard(label: String, value: String, modifier: Modifier = Modifi
 }
 
 private fun LocalDate.weekStart(): LocalDate = minusDays((dayOfWeek.value - 1).toLong())
+
+private fun readStreakStartDateFor(days: Int): LocalDate {
+    return if (days <= 0) LocalDate.now() else LocalDate.now().minusDays((days - 1).toLong())
+}
+
+private fun completeStreakStartDateFor(weeks: Int): LocalDate {
+    val currentWeek = LocalDate.now().weekStart()
+    return if (weeks <= 0) currentWeek else currentWeek.minusWeeks((weeks - 1).toLong())
+}
+
+private fun LocalDate.readStreakDaysThroughToday(): Int {
+    val today = LocalDate.now()
+    return if (isAfter(today)) 0 else ChronoUnit.DAYS.between(this, today).toInt() + 1
+}
+
+private fun LocalDate.completeStreakWeeksThroughThisWeek(): Int {
+    val startWeek = weekStart()
+    val currentWeek = LocalDate.now().weekStart()
+    return if (startWeek.isAfter(currentWeek)) 0 else ChronoUnit.WEEKS.between(startWeek, currentWeek).toInt() + 1
+}
 
 private fun LocalDate?.toStreakStartMessage(): String {
     return this?.let { "Streak started ${it.toDisplayDate()}" } ?: "Streak start date is not available yet"
