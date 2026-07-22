@@ -1,8 +1,53 @@
+import org.gradle.api.DefaultTask
+import org.gradle.api.file.ConfigurableFileCollection
+import org.gradle.api.file.DirectoryProperty
+import org.gradle.api.file.FileSystemOperations
+import org.gradle.api.tasks.InputDirectory
+import org.gradle.api.tasks.InputFiles
+import org.gradle.api.tasks.OutputDirectory
+import org.gradle.api.tasks.PathSensitive
+import org.gradle.api.tasks.PathSensitivity
+import org.gradle.api.tasks.TaskAction
 import java.util.Properties
+import javax.inject.Inject
+
+abstract class GenerateReleaseAssetsTask : DefaultTask() {
+    @get:InputFiles
+    @get:PathSensitive(PathSensitivity.RELATIVE)
+    abstract val configFiles: ConfigurableFileCollection
+
+    @get:InputDirectory
+    @get:PathSensitive(PathSensitivity.RELATIVE)
+    abstract val badgeDirectory: DirectoryProperty
+
+    @get:OutputDirectory
+    abstract val outputDirectory: DirectoryProperty
+
+    @get:Inject
+    abstract val fileSystemOperations: FileSystemOperations
+
+    @TaskAction
+    fun generate() {
+        fileSystemOperations.sync {
+            from(configFiles)
+            from(badgeDirectory) {
+                include("*.png")
+                eachFile {
+                    val baseName = name.substringBeforeLast(".")
+                        .lowercase()
+                        .replace(Regex("[^a-z0-9]+"), "_")
+                        .trim('_')
+                    path = "badges/$baseName.png"
+                }
+                includeEmptyDirs = false
+            }
+            into(outputDirectory)
+        }
+    }
+}
 
 plugins {
     id("com.android.application")
-    id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
     id("org.jetbrains.kotlin.plugin.serialization")
     id("com.google.devtools.ksp")
@@ -33,14 +78,14 @@ val hasReleaseSigning = listOf(
 
 android {
     namespace = "com.releaseplanner.tracker"
-    compileSdk = 35
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "com.ppactracker.powerdevbox"
         minSdk = 26
-        targetSdk = 35
-        versionCode = 7
-        versionName = "0.1.6"
+        targetSdk = 37
+        versionCode = 8
+        versionName = "0.1.7"
     }
 
     buildFeatures {
@@ -66,16 +111,6 @@ android {
         }
     }
 
-    val generatedConfigAssets = layout.buildDirectory.dir("generated/assets/releaseConfig")
-    val generatedBadgeAssets = layout.buildDirectory.dir("generated/assets/releaseBadges")
-
-    sourceSets {
-        getByName("main") {
-            assets.srcDir(generatedConfigAssets)
-            assets.srcDir(generatedBadgeAssets)
-        }
-    }
-
     kotlin {
         jvmToolchain(17)
     }
@@ -87,29 +122,22 @@ android {
     }
 }
 
-val copyReleaseConfigAssets by tasks.registering(Copy::class) {
-    from(rootProject.layout.projectDirectory.file("api.json"))
-    from(rootProject.layout.projectDirectory.file("rewards.json"))
-    into(layout.buildDirectory.dir("generated/assets/releaseConfig"))
+val prepareReleaseAssets by tasks.registering(GenerateReleaseAssetsTask::class) {
+    configFiles.from(
+        rootProject.layout.projectDirectory.file("api.json"),
+        rootProject.layout.projectDirectory.file("rewards.json"),
+    )
+    badgeDirectory.set(rootProject.layout.projectDirectory.dir("badges"))
+    outputDirectory.set(layout.buildDirectory.dir("generated/assets/release"))
 }
 
-val copyBadgeAssets by tasks.registering(Copy::class) {
-    from(rootProject.layout.projectDirectory.dir("badges")) {
-        include("*.png")
-        eachFile {
-            val baseName = name.substringBeforeLast(".")
-                .lowercase()
-                .replace(Regex("[^a-z0-9]+"), "_")
-                .trim('_')
-            path = "badges/$baseName.png"
-        }
+androidComponents {
+    onVariants(selector().all()) { variant ->
+        variant.sources.assets?.addGeneratedSourceDirectory(
+            prepareReleaseAssets,
+            GenerateReleaseAssetsTask::outputDirectory,
+        )
     }
-    includeEmptyDirs = false
-    into(layout.buildDirectory.dir("generated/assets/releaseBadges"))
-}
-
-tasks.named("preBuild") {
-    dependsOn(copyReleaseConfigAssets, copyBadgeAssets)
 }
 
 tasks.matching { it.name == "bundleRelease" || it.name == "assembleRelease" }.configureEach {
@@ -129,14 +157,14 @@ dependencies {
     implementation("androidx.core:core-ktx:1.15.0")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
-    implementation("androidx.room:room-ktx:2.6.1")
-    implementation("androidx.room:room-runtime:2.6.1")
-    implementation("androidx.work:work-runtime-ktx:2.10.0")
+    implementation("androidx.room:room-ktx:2.8.4")
+    implementation("androidx.room:room-runtime:2.8.4")
+    implementation("androidx.work:work-runtime-ktx:2.11.2")
     implementation("io.ktor:ktor-client-android:3.0.1")
     implementation("io.ktor:ktor-client-content-negotiation:3.0.1")
     implementation("io.ktor:ktor-serialization-kotlinx-json:3.0.1")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
-    ksp("androidx.room:room-compiler:2.6.1")
+    ksp("androidx.room:room-compiler:2.8.4")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
 }

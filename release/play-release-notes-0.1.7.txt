@@ -1,0 +1,5 @@
+Notifications now arrive at the time selected in Settings.
+
+When no open tasks are available, the daily read streak and weekly completion streak are automatically marked complete and confirmed with a message.
+
+Updated for Android 17.

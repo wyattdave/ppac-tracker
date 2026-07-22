@@ -53,6 +53,14 @@ class ReleasePreferences(
         notificationSettingsState.value = readNotificationSettings()
     }
 
+    fun hasRequestedExactAlarmAccess(): Boolean {
+        return prefs.getBoolean(EXACT_ALARM_ACCESS_REQUESTED_KEY, false)
+    }
+
+    fun markExactAlarmAccessRequested() {
+        prefs.edit().putBoolean(EXACT_ALARM_ACCESS_REQUESTED_KEY, true).apply()
+    }
+
     fun recordTaskRead(date: LocalDate = LocalDate.now()) {
         updateDateSet(READ_TASK_DATES_KEY, date)
         refreshRewardPerformance(date)
@@ -67,6 +75,25 @@ class ReleasePreferences(
     fun recordApiFailure(date: LocalDate = LocalDate.now()) {
         updateDateSet(API_FAILURE_DATES_KEY, date)
         refreshRewardPerformance(date)
+    }
+
+    fun completeStreaksWhenNoOpenTasks(date: LocalDate = LocalDate.now()): Boolean {
+        val readDates = readDateSet(READ_TASK_DATES_KEY)
+        val completeDates = readDateSet(COMPLETE_TASK_DATES_KEY)
+        val needsReadCompletion = date !in readDates
+        val needsWeeklyCompletion = completeDates.none { it.weekStart() == date.weekStart() }
+        if (!needsReadCompletion && !needsWeeklyCompletion) return false
+
+        prefs.edit().apply {
+            if (needsReadCompletion) {
+                putStringSet(READ_TASK_DATES_KEY, (readDates + date).map(LocalDate::toString).toSet())
+            }
+            if (needsWeeklyCompletion) {
+                putStringSet(COMPLETE_TASK_DATES_KEY, (completeDates + date).map(LocalDate::toString).toSet())
+            }
+        }.apply()
+        refreshRewardPerformance(date)
+        return true
     }
 
     fun refreshRewardPerformance(date: LocalDate = LocalDate.now()) {
@@ -310,6 +337,7 @@ class ReleasePreferences(
         const val NOTIFICATIONS_ENABLED_KEY = "notifications_enabled"
         const val NOTIFICATION_HOUR_KEY = "notification_hour"
         const val NOTIFICATION_MINUTE_KEY = "notification_minute"
+        const val EXACT_ALARM_ACCESS_REQUESTED_KEY = "exact_alarm_access_requested"
         const val LONGEST_READ_STREAK_DAYS_KEY = "longest_read_streak_days"
         const val LONGEST_READ_STREAK_START_DATE_KEY = "longest_read_streak_start_date"
         const val LONGEST_COMPLETE_STREAK_WEEKS_KEY = "longest_complete_streak_weeks"

@@ -14,9 +14,12 @@ import com.releaseplanner.tracker.data.local.ReleasePlannerDatabase
 import com.releaseplanner.tracker.data.local.ReleaseUpdateEntity
 import com.releaseplanner.tracker.data.local.UserTrackingEntity
 import com.releaseplanner.tracker.sync.ReleaseSyncScheduler
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -45,6 +48,11 @@ class ReleaseTrackerViewModel(application: Application) : AndroidViewModel(appli
     private val isDebugLoading = MutableStateFlow(false)
     private val errorMessage = MutableStateFlow<String?>(null)
     private val apiDiagnostic = MutableStateFlow<com.releaseplanner.tracker.data.ReleaseApiDiagnostic?>(null)
+    private val updatesLoaded = MutableStateFlow(false)
+    private val currentDate = MutableStateFlow(LocalDate.now())
+    private val _messages = Channel<String>(Channel.BUFFERED)
+
+    val messages = _messages.receiveAsFlow()
 
     private val filterControls = combine(
         selectedProduct,
@@ -193,12 +201,42 @@ class ReleaseTrackerViewModel(application: Application) : AndroidViewModel(appli
 
     init {
         viewModelScope.launch {
-            if (repository.isEmpty()) refresh()
+            if (repository.isEmpty()) {
+                refresh()
+            } else {
+                updatesLoaded.value = true
+            }
+        }
+        viewModelScope.launch {
+            combine(
+                dataState,
+                preferences.sourceSettings,
+                updatesLoaded,
+                currentDate,
+            ) { data, sourceSettings, loaded, date ->
+                val enabledSourceProducts = sourceSettings.filter { it.enabled }.map { it.product }.toSet()
+                val trackingByRelease = data.tracking.associateBy { it.releaseId }
+                val hasOpenTasks = data.updates
+                    .asSequence()
+                    .filter { it.sourceProduct in enabledSourceProducts }
+                    .map { update -> trackingByRelease[update.id] ?: UserTrackingEntity(releaseId = update.id) }
+                    .filterNot { it.isHidden }
+                    .any { !it.isComplete && !it.isSkipped }
+                NoOpenTasksState(loaded = loaded, noOpenTasks = !hasOpenTasks, date = date)
+            }
+                .distinctUntilChanged()
+                .collect { state ->
+                    if (state.loaded && state.noOpenTasks && preferences.completeStreaksWhenNoOpenTasks(state.date)) {
+                        _messages.send("There are no open tasks, so your read and weekly streaks have been marked complete.")
+                    }
+                }
         }
         viewModelScope.launch {
             while (true) {
                 delay(millisecondsUntilNextDay())
-                preferences.refreshRewardPerformance()
+                val today = LocalDate.now()
+                currentDate.value = today
+                preferences.refreshRewardPerformance(today)
             }
         }
     }
@@ -275,6 +313,9 @@ class ReleaseTrackerViewModel(application: Application) : AndroidViewModel(appli
             errorMessage.value = null
             runCatching { repository.refresh() }
                 .onSuccess { result ->
+                    if (result.total > 0 || result.failureMessages.isEmpty()) {
+                        updatesLoaded.value = true
+                    }
                     when {
                         result.total == 0 && result.failureMessages.isNotEmpty() -> {
                             errorMessage.value = "Sync failed: ${result.failureMessages.joinToString()}"
@@ -565,6 +606,12 @@ class ReleaseTrackerViewModel(application: Application) : AndroidViewModel(appli
         val updates: List<ReleaseUpdateEntity>,
         val tracking: List<UserTrackingEntity>,
         val events: List<ChangeEventEntity>,
+    )
+
+    private data class NoOpenTasksState(
+        val loaded: Boolean,
+        val noOpenTasks: Boolean,
+        val date: LocalDate,
     )
 
     private data class FilterControlValues(

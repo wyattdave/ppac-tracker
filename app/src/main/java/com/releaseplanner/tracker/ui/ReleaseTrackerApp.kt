@@ -3,6 +3,9 @@ package com.releaseplanner.tracker.ui
 import android.content.Context
 import android.content.Intent
 import android.graphics.BitmapFactory
+import android.net.Uri
+import android.os.Build
+import android.provider.Settings
 import android.text.Html
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
@@ -92,6 +95,7 @@ import com.releaseplanner.tracker.data.NotificationSettings
 import com.releaseplanner.tracker.data.ReleaseSourceSetting
 import com.releaseplanner.tracker.data.ReleaseThemeMode
 import com.releaseplanner.tracker.data.local.ReleaseUpdateEntity
+import com.releaseplanner.tracker.sync.ReleaseSyncScheduler
 import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.LocalDate
@@ -133,6 +137,12 @@ fun ReleaseTrackerApp(viewModel: ReleaseTrackerViewModel, state: ReleaseTrackerU
     var knownCompletedBadgeNames by remember { mutableStateOf<Set<String>?>(null) }
     var updatesFilterPanelVisible by remember { mutableStateOf(false) }
     var updatesResetToken by remember { mutableStateOf(0) }
+
+    LaunchedEffect(viewModel, context) {
+        viewModel.messages.collect { message ->
+            Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+        }
+    }
 
     LaunchedEffect(state.rewardBadges, state.announcedRewardBadgeNames) {
         val completedNames = state.rewardBadges.filter { it.isComplete }.map { it.name }.toSet()
@@ -605,6 +615,7 @@ private fun SettingsScreen(
     rewardDebugEnabled: Boolean,
     onAboutTapped: () -> Unit,
 ) {
+    val context = LocalContext.current
     val uriHandler = LocalUriHandler.current
 
     Column(
@@ -626,8 +637,14 @@ private fun SettingsScreen(
         }
         NotificationSettingsCard(
             settings = state.notificationSettings,
-            onEnabledChange = viewModel::setNotificationEnabled,
-            onTimeSelected = viewModel::setNotificationTime,
+            onEnabledChange = { enabled ->
+                if (enabled) requestExactAlarmAccessIfNeeded(context)
+                viewModel.setNotificationEnabled(enabled)
+            },
+            onTimeSelected = { hour, minute ->
+                requestExactAlarmAccessIfNeeded(context)
+                viewModel.setNotificationTime(hour, minute)
+            },
         )
         ProductSettingsCard(
             settings = state.sourceSettings,
@@ -1740,6 +1757,21 @@ private fun LocalDate.weekStart(): LocalDate = minusDays((dayOfWeek.value - 1).t
 
 private fun readStreakStartDateFor(days: Int): LocalDate {
     return if (days <= 0) LocalDate.now() else LocalDate.now().minusDays((days - 1).toLong())
+}
+
+private fun requestExactAlarmAccessIfNeeded(context: Context) {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S || ReleaseSyncScheduler.canScheduleExactAlarms(context)) return
+
+    Toast.makeText(
+        context,
+        "Allow alarms and reminders so notifications arrive at the selected time.",
+        Toast.LENGTH_LONG,
+    ).show()
+    val intent = Intent(
+        Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM,
+        Uri.parse("package:${context.packageName}"),
+    )
+    context.startActivity(intent)
 }
 
 private fun completeStreakStartDateFor(weeks: Int): LocalDate {

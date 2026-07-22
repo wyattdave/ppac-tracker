@@ -7,7 +7,6 @@ import com.releaseplanner.tracker.data.ReleaseConfigLoader
 import com.releaseplanner.tracker.data.ReleasePreferences
 import com.releaseplanner.tracker.data.ReleaseRepository
 import com.releaseplanner.tracker.data.local.ReleasePlannerDatabase
-import com.releaseplanner.tracker.notifications.ReleaseNotifications
 import java.io.IOException
 
 class ReleaseSyncWorker(
@@ -31,8 +30,6 @@ class ReleaseSyncWorker(
             return Result.retry()
         }
 
-        ReleaseNotifications.showSyncNotification(applicationContext, repository.summaryMetrics())
-        ReleaseSyncScheduler.scheduleNext(applicationContext, preferences.notificationSettings.value)
         return Result.success()
     }
 }
