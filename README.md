@@ -46,7 +46,12 @@ For Play Store distribution, add a separate signed `.aab` workflow later. That w
 
 ## Data Source
 
-The initial release sources are based on `api.json` and are bundled in the app. The API response shape is based on `examp-payload.json`.
+The release sources are defined in `api.json` and bundled in the app. Each source has a `Schema` value:
+
+- `ReleasePlanner` for the legacy `results` response.
+- `M365` for the release communications `value` response.
+
+Sources using either schema are adapted into the same local release model. M365 month-only dates are treated as covering the full month for date and week filters.
 Rewards are based on `rewards.json`, which is bundled alongside the release source config. Product settings, task tracking, and streak progress are stored locally and included in Android backup/device transfer.
 
 ## Current Scope

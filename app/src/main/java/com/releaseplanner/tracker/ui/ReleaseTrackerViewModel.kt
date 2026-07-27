@@ -147,7 +147,8 @@ class ReleaseTrackerViewModel(application: Application) : AndroidViewModel(appli
             .filter { controls.selectedProduct == "All" || it.update.product == controls.selectedProduct }
             .filter { item ->
                 controls.timelineDateFilter?.let { filterDate ->
-                    item.update.timelineDate(controls.timelineSort)?.let { !it.isBefore(filterDate) } == true
+                    item.update.timelineDateRange(controls.timelineSort)
+                        ?.let { !it.endInclusive.isBefore(filterDate) } == true
                 } ?: true
             }
             .sortedWith(timelineComparator(controls.timelineSort))
@@ -432,6 +433,8 @@ class ReleaseTrackerViewModel(application: Application) : AndroidViewModel(appli
         val normalized = query.trim().lowercase()
         if (normalized.isBlank()) return true
         return listOf(
+            update.featureName,
+            update.product,
             update.docsName,
             update.featureDetails,
             update.enabledFor,
@@ -491,8 +494,8 @@ class ReleaseTrackerViewModel(application: Application) : AndroidViewModel(appli
     private fun ReleaseUpdateEntity.isGaThisWeek(): Boolean {
         val today = LocalDate.now()
         val sevenDaysAhead = today.plusDays(7)
-        val gaDate = timelineDate(TimelineSortOption.GeneralAvailability) ?: return false
-        return !gaDate.isBefore(today) && !gaDate.isAfter(sevenDaysAhead)
+        val gaDate = timelineDateRange(TimelineSortOption.GeneralAvailability) ?: return false
+        return gaDate.overlaps(today, sevenDaysAhead)
     }
 
     private fun String.isShippedStage(): Boolean = equals("Shipped", ignoreCase = true)

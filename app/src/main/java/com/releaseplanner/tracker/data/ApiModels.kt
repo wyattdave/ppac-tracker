@@ -41,4 +41,5 @@ data class ReleaseItemDto(
     @SerialName("docUrl") val docUrl: String = "",
     @SerialName("Createdon") val createdOn: String = "",
     @SerialName("geos") val geos: List<String> = emptyList(),
+    @SerialName("SourceFingerprint") val sourceFingerprint: String = "",
 )

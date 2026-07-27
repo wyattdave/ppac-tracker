@@ -1,0 +1,2 @@
+8c21f173d922452af306adae6ff3680881c0ba9a073fe018937f8868ca033597  ppac-tracker-0.1.8-play.aab
+aa1e9296e187ec0e816ad8936ae67ca3c79bcefa27b2324929d1364a5f8cc2ac  ppac-tracker-0.1.8-release.apk

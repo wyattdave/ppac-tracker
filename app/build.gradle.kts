@@ -84,8 +84,8 @@ android {
         applicationId = "com.ppactracker.powerdevbox"
         minSdk = 26
         targetSdk = 37
-        versionCode = 8
-        versionName = "0.1.7"
+        versionCode = 9
+        versionName = "0.1.8"
     }
 
     buildFeatures {
@@ -165,6 +165,8 @@ dependencies {
     implementation("io.ktor:ktor-serialization-kotlinx-json:3.0.1")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
     ksp("androidx.room:room-compiler:2.8.4")
+
+    testImplementation("junit:junit:4.13.2")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
 }

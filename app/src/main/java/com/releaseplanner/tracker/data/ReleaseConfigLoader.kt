@@ -46,6 +46,7 @@ private data class ReleaseSourceConfig(
     @SerialName("Product") val product: String = "",
     @SerialName("Version") val version: String = "",
     @SerialName("Type") val type: String = "",
+    @SerialName("Schema") val schema: String = "",
     @SerialName("Url") val url: String = "",
     @SerialName("url") val legacyUrl: String = "",
 ) {
@@ -57,6 +58,7 @@ private data class ReleaseSourceConfig(
             version = version,
             type = type,
             url = configuredUrl,
+            schema = ReleaseSourceSchema.fromConfig(schema),
         )
     }
 }

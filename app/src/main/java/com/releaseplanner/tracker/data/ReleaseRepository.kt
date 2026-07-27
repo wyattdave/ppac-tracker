@@ -2,6 +2,7 @@ package com.releaseplanner.tracker.data
 
 import com.releaseplanner.tracker.data.local.ChangeEventEntity
 import com.releaseplanner.tracker.data.local.ReleasePlannerDatabase
+import com.releaseplanner.tracker.data.local.ReleaseUpdateEntity
 import com.releaseplanner.tracker.data.local.UserTrackingEntity
 import java.util.UUID
 
@@ -31,9 +32,35 @@ class ReleaseRepository(
         activeSources.forEach { source ->
             runCatching { client.fetch(source) }
                 .onSuccess { items ->
+                    val sourceExisting = if (source.schema == ReleaseSourceSchema.M365) {
+                        database.releaseUpdateDao().getAll()
+                            .filter { it.sourceProduct == source.product }
+                    } else {
+                        emptyList()
+                    }
+                    val m365ExistingByProductId = sourceExisting
+                        .filter { it.isM365Adapted() && it.productId.isNotBlank() }
+                        .associateBy { it.productId }
+                    val legacyExistingByTitle = sourceExisting
+                        .filterNot { it.isM365Adapted() }
+                        .groupBy { it.featureName.normalizedReleaseTitle() }
+                        .mapValuesTo(mutableMapOf()) { (_, matches) -> matches.toMutableList() }
+
                     val updates = items.map { dto ->
                         val id = dto.stableId(source)
-                        val existing = database.releaseUpdateDao().getById(id)
+                        val existingById = database.releaseUpdateDao().getById(id)
+                        val existingByProductId = if (existingById == null) {
+                            m365ExistingByProductId[dto.productId]
+                        } else {
+                            null
+                        }
+                        val existingByLegacyTitle = if (existingById == null && existingByProductId == null) {
+                            legacyExistingByTitle[dto.featureName.normalizedReleaseTitle()]
+                                ?.removeFirstOrNull()
+                        } else {
+                            null
+                        }
+                        val existing = existingById ?: existingByProductId ?: existingByLegacyTitle
                         val entity = dto.toEntity(source, existing, now)
                         val isNewlyDetected = existing == null
                         val isChangedNow = existing != null && existing.contentHash != entity.contentHash
@@ -76,6 +103,11 @@ class ReleaseRepository(
             syncedAt = now,
             sourceCount = activeSources.size,
         )
+    }
+
+    private fun ReleaseUpdateEntity.isM365Adapted(): Boolean {
+        return releasePlanId.startsWith("m365:", ignoreCase = true) ||
+            snapshotId.startsWith("m365:", ignoreCase = true)
     }
 
     suspend fun debugFirstSource(): ReleaseApiDiagnostic {

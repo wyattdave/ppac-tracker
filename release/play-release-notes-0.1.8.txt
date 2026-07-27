@@ -1,0 +1,5 @@
+Added support for Microsoft 365 release communications alongside the existing Power Platform release planner feed.
+
+Improved date handling for month-based releases, including timeline and week filters.
+
+Improved release syncing, source mapping, and update metrics.

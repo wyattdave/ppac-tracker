@@ -1,0 +1,402 @@
+{
+    "@odata.context": "https://relcomms-prod-dagnegedescbeefs.b02.azurefd.net/api/v2/$metadata#M365",
+    "@odata.count": 9,
+    "value": [
+        {
+            "id": 567894,
+            "title": "Microsoft Copilot Studio: Share Autonomous Agents to End Users (Run-Only)",
+            "description": "Previously, autonomous agents could only be used and managed by makers, limiting their reach to the people who needed them. Run-only sharing enables makers to securely share autonomous agents with end users, allowing users to benefit from agent-driven automation without requiring edit permissions or ownership. This extends autonomous agent capabilities to a broader audience while maintaining governance and control.",
+            "cloudInstances": [
+                "Worldwide (Standard Multi-Tenant)"
+            ],
+            "platforms": [
+                "Web"
+            ],
+            "releaseRings": [
+                "General Availability",
+                "Preview"
+            ],
+            "moreInfoUrls": [],
+            "products": [
+                "Microsoft Copilot Studio"
+            ],
+            "generalAvailabilityDate": "2027-01",
+            "previewAvailabilityDate": "2026-08",
+            "created": "2026-07-20T22:37:15.9046041Z",
+            "status": "In development",
+            "modified": "2026-07-20T22:37:15.9046041Z",
+            "locale": null,
+            "availabilities": [
+                {
+                    "ring": "General Availability",
+                    "year": 2027,
+                    "month": "January"
+                },
+                {
+                    "ring": "Preview",
+                    "year": 2026,
+                    "month": "August"
+                }
+            ]
+        },
+        {
+            "id": 566999,
+            "title": "Microsoft Copilot Studio: Enable express mode for flows invoked by an agent or app",
+            "description": "Express mode ensures agents and apps receive timely and reliable responses by dramatically accelerating flow run times. This reduces flow failures, improves user experience, and eliminates costly interruptions caused by timeout issues. Organizations benefit from more dependable automations, higher adoption, and smoother operational workflows.",
+            "cloudInstances": [
+                "Worldwide (Standard Multi-Tenant)"
+            ],
+            "platforms": [
+                "Web"
+            ],
+            "releaseRings": [
+                "General Availability",
+                "Preview"
+            ],
+            "moreInfoUrls": [],
+            "products": [
+                "Microsoft Copilot (Microsoft 365)",
+                "Microsoft Copilot Studio"
+            ],
+            "generalAvailabilityDate": "2026-11",
+            "previewAvailabilityDate": "2025-11",
+            "created": "2026-07-10T21:58:35.1674832Z",
+            "status": "In development",
+            "modified": "2026-07-10T21:58:35.1674832Z",
+            "locale": null,
+            "availabilities": [
+                {
+                    "ring": "General Availability",
+                    "year": 2026,
+                    "month": "November"
+                },
+                {
+                    "ring": "Preview",
+                    "year": 2025,
+                    "month": "November"
+                }
+            ]
+        },
+        {
+            "id": 562220,
+            "title": "Microsoft Copilot Studio: Supercharge your workflows with computer use",
+            "description": "Add resilient, AI-powered UI automation directly into your workflows with computer use tools. Makers can build reusable, goal-oriented automations that adapt dynamically to website or app changes, while admins maintain governance through access controls, hosted browser management, and environment-level permissions.",
+            "cloudInstances": [
+                "Worldwide (Standard Multi-Tenant)"
+            ],
+            "platforms": [
+                "Web"
+            ],
+            "releaseRings": [
+                "General Availability",
+                "Preview"
+            ],
+            "moreInfoUrls": [],
+            "products": [
+                "Microsoft Copilot (Microsoft 365)",
+                "Microsoft Copilot Studio"
+            ],
+            "generalAvailabilityDate": "2026-10",
+            "previewAvailabilityDate": "2026-04",
+            "created": "2026-05-15T18:00:35.7626991Z",
+            "status": "In development",
+            "modified": "2026-05-15T18:00:35.7626991Z",
+            "locale": null,
+            "availabilities": [
+                {
+                    "ring": "General Availability",
+                    "year": 2026,
+                    "month": "October"
+                },
+                {
+                    "ring": "Preview",
+                    "year": 2026,
+                    "month": "April"
+                }
+            ]
+        },
+        {
+            "id": 562222,
+            "title": "Microsoft Copilot Studio: Invoke agents as workflow steps with the agent node",
+            "description": "Add an agent node to your workflow to reason over data, call tools, and return a response, all within a single step. The agent node lets you embed reasoning directly into your workflow. This means fewer manual handoffs, faster processing times, and workflows that can handle nuanced decisions without additional development effort, helping teams automate more of their end-to-end processes and reduce operational overhead.",
+            "cloudInstances": [
+                "Worldwide (Standard Multi-Tenant)"
+            ],
+            "platforms": [
+                "Web"
+            ],
+            "releaseRings": [
+                "General Availability",
+                "Preview"
+            ],
+            "moreInfoUrls": [],
+            "products": [
+                "Microsoft Copilot (Microsoft 365)",
+                "Microsoft Copilot Studio"
+            ],
+            "generalAvailabilityDate": "2026-09",
+            "previewAvailabilityDate": "2026-04",
+            "created": "2026-05-14T23:15:59.0245387Z",
+            "status": "In development",
+            "modified": "2026-05-14T23:15:59.0245387Z",
+            "locale": null,
+            "availabilities": [
+                {
+                    "ring": "General Availability",
+                    "year": 2026,
+                    "month": "September"
+                },
+                {
+                    "ring": "Preview",
+                    "year": 2026,
+                    "month": "April"
+                }
+            ]
+        },
+        {
+            "id": 566859,
+            "title": "Microsoft Copilot Studio: Use SharePoint lists as a knowledge source",
+            "description": "Unlock the full value of your structured data by bringing SharePoint lists directly into your Microsoft Copilot Studio agents. With native support, customers can ground AI responses in up-to-date, business-critical data\u2014such as tasks, inventory, customers, or operations\u2014without manual data movement or complex integrations. This enables more accurate, context-aware copilots that reflect how your business runs, helping teams make faster decisions, reduce errors, and automate workflows with confidence.",
+            "cloudInstances": [
+                "Worldwide (Standard Multi-Tenant)"
+            ],
+            "platforms": [
+                "Web"
+            ],
+            "releaseRings": [
+                "General Availability",
+                "Preview"
+            ],
+            "moreInfoUrls": [],
+            "products": [
+                "Microsoft Copilot (Microsoft 365)",
+                "Microsoft Copilot Studio"
+            ],
+            "generalAvailabilityDate": "2026-09",
+            "previewAvailabilityDate": "2026-07",
+            "created": "2026-07-07T23:01:01.6729014Z",
+            "status": "In development",
+            "modified": "2026-07-07T23:01:01.6729014Z",
+            "locale": null,
+            "availabilities": [
+                {
+                    "ring": "General Availability",
+                    "year": 2026,
+                    "month": "September"
+                },
+                {
+                    "ring": "Preview",
+                    "year": 2026,
+                    "month": "July"
+                }
+            ]
+        },
+        {
+            "id": 566873,
+            "title": "Microsoft Copilot Studio: Enforce safe sharing by detecting credential oversharing",
+            "description": "This feature helps organizations reduce security risk by preventing agents and flows from being shared when they rely on unsafe identities, such as maker credentials. By detecting identity oversharing early and enforcing safe\u2011sharing policies at publish and share time, customers can avoid identity leakage, privilege escalation, and unintended access - while still allowing makers to build and iterate safely within approved guardrails.",
+            "cloudInstances": [
+                "Worldwide (Standard Multi-Tenant)"
+            ],
+            "platforms": [
+                "Web"
+            ],
+            "releaseRings": [
+                "General Availability",
+                "Preview"
+            ],
+            "moreInfoUrls": [],
+            "products": [
+                "Microsoft Copilot (Microsoft 365)",
+                "Microsoft Copilot Studio"
+            ],
+            "generalAvailabilityDate": "2026-09",
+            "previewAvailabilityDate": "2026-07",
+            "created": "2026-07-01T23:03:18.2442931Z",
+            "status": "In development",
+            "modified": "2026-07-01T23:03:18.2442931Z",
+            "locale": null,
+            "availabilities": [
+                {
+                    "ring": "General Availability",
+                    "year": 2026,
+                    "month": "September"
+                },
+                {
+                    "ring": "Preview",
+                    "year": 2026,
+                    "month": "July"
+                }
+            ]
+        },
+        {
+            "id": 566998,
+            "title": "Microsoft Copilot Studio: Invoke agents as workflow steps with the agent node",
+            "description": "The agent node lets you embed reasoning directly into your workflow. This means fewer manual handoffs, faster processing times, and workflows that can handle nuanced decisions without additional development effort, helping teams automate more of their end-to-end processes and reduce operational overhead.",
+            "cloudInstances": [
+                "Worldwide (Standard Multi-Tenant)"
+            ],
+            "platforms": [
+                "Web"
+            ],
+            "releaseRings": [
+                "General Availability",
+                "Preview"
+            ],
+            "moreInfoUrls": [],
+            "products": [
+                "Microsoft Copilot (Microsoft 365)",
+                "Microsoft Copilot Studio"
+            ],
+            "generalAvailabilityDate": "2026-09",
+            "previewAvailabilityDate": "2026-04",
+            "created": "2026-07-01T23:03:18.2442931Z",
+            "status": "In development",
+            "modified": "2026-07-01T23:03:18.2442931Z",
+            "locale": null,
+            "availabilities": [
+                {
+                    "ring": "General Availability",
+                    "year": 2026,
+                    "month": "September"
+                },
+                {
+                    "ring": "Preview",
+                    "year": 2026,
+                    "month": "April"
+                }
+            ]
+        },
+        {
+            "id": 566997,
+            "title": "Microsoft Copilot Studio: Block the use of maker-provided credentials for authentication",
+            "description": "By blocking the use of maker\u0027s credentials by AI agents, admins can increase the security and compliance of agents in their organizations:\n- Prevent unauthorized access to sensitive systems or data that the maker\u0027s credentials might have access to.\n- Help organizations comply with data protection regulations (such as GDPR or HIPAA) by ensuring only authorized identities are used for data access.\n- Enable IT and security teams to enforce organizational policies around identity and access management.\n- Increase trust among stakeholders and IT departments, making it easier to adopt AI agents at scale.",
+            "cloudInstances": [
+                "Worldwide (Standard Multi-Tenant)"
+            ],
+            "platforms": [
+                "Web"
+            ],
+            "releaseRings": [
+                "General Availability",
+                "Preview"
+            ],
+            "moreInfoUrls": [],
+            "products": [
+                "Microsoft Copilot (Microsoft 365)",
+                "Microsoft Copilot Studio"
+            ],
+            "generalAvailabilityDate": "2026-08",
+            "previewAvailabilityDate": "2025-09",
+            "created": "2026-07-02T23:12:48.2177075Z",
+            "status": "In development",
+            "modified": "2026-07-02T23:12:48.2177075Z",
+            "locale": null,
+            "availabilities": [
+                {
+                    "ring": "General Availability",
+                    "year": 2026,
+                    "month": "August"
+                },
+                {
+                    "ring": "Preview",
+                    "year": 2025,
+                    "month": "September"
+                }
+            ]
+        },
+        {
+            "id": 562221,
+            "title": "Microsoft Copilot Studio: Use MCP-compliant tools in agent workflows",
+            "description": "Integrate proprietary systems, dynamic knowledge sources, and custom actions into your agentic workflows with MCP support, accelerating extensibility while preserving workflow reliability. This integration improves reuse across agents and workflows, reduces duplication of integrations, and embraces an emerging open and extensible agent ecosystem.",
+            "cloudInstances": [
+                "Worldwide (Standard Multi-Tenant)"
+            ],
+            "platforms": [
+                "Web"
+            ],
+            "releaseRings": [
+                "General Availability",
+                "Preview"
+            ],
+            "moreInfoUrls": [],
+            "products": [
+                "Microsoft Copilot (Microsoft 365)",
+                "Microsoft Copilot Studio"
+            ],
+            "generalAvailabilityDate": "2026-06",
+            "previewAvailabilityDate": "2026-05",
+            "created": "2026-05-15T18:00:35.7626991Z",
+            "status": "In development",
+            "modified": "2026-05-15T18:00:35.7626991Z",
+            "locale": null,
+            "availabilities": [
+                {
+                    "ring": "General Availability",
+                    "year": 2026,
+                    "month": "June"
+                },
+                {
+                    "ring": "Preview",
+                    "year": 2026,
+                    "month": "May"
+                }
+            ]
+        }
+    ],
+    "facets": [
+        {
+            "name": "CloudInstance",
+            "values": [
+                {
+                    "value": "Worldwide (Standard Multi-Tenant)",
+                    "count": 9
+                }
+            ]
+        },
+        {
+            "name": "Platform",
+            "values": [
+                {
+                    "value": "Web",
+                    "count": 9
+                }
+            ]
+        },
+        {
+            "name": "ReleaseRing",
+            "values": [
+                {
+                    "value": "General Availability",
+                    "count": 9
+                },
+                {
+                    "value": "Preview",
+                    "count": 9
+                }
+            ]
+        },
+        {
+            "name": "Product",
+            "values": [
+                {
+                    "value": "Microsoft Copilot (Microsoft 365)",
+                    "count": 8
+                },
+                {
+                    "value": "Microsoft Copilot Studio",
+                    "count": 9
+                }
+            ]
+        },
+        {
+            "name": "Status",
+            "values": [
+                {
+                    "value": "In development",
+                    "count": 9
+                }
+            ]
+        }
+    ]
+}

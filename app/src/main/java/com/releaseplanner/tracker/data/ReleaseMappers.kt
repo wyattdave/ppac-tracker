@@ -7,6 +7,16 @@ fun ReleaseItemDto.stableId(source: ReleaseSource): String {
     return releasePlanId.ifBlank { snapshotId }.ifBlank { "${source.product}:$featureName".sha256() }
 }
 
+fun String.normalizedReleaseTitle(): String {
+    return replace(
+        Regex("^\\s*Microsoft\\s+Copilot\\s+Studio\\s*:\\s*", RegexOption.IGNORE_CASE),
+        "",
+    )
+        .trim()
+        .lowercase()
+        .replace(Regex("\\s+"), " ")
+}
+
 fun ReleaseItemDto.toEntity(
     source: ReleaseSource,
     existing: ReleaseUpdateEntity?,
@@ -15,7 +25,7 @@ fun ReleaseItemDto.toEntity(
     val hash = contentHash(source)
     val contentChanged = existing != null && existing.contentHash != hash
     return ReleaseUpdateEntity(
-        id = stableId(source),
+        id = existing?.id ?: stableId(source),
         snapshotId = snapshotId,
         releasePlanId = releasePlanId,
         productId = productId,
@@ -81,6 +91,7 @@ private fun ReleaseItemDto.contentHash(source: ReleaseSource): String {
         docUrl,
         businessValue,
         featureDetails,
+        sourceFingerprint,
     ).joinToString("|").sha256()
 }
 

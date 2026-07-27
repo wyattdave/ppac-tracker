@@ -5,9 +5,26 @@ data class ReleaseSource(
     val version: String,
     val type: String,
     val url: String,
+    val schema: ReleaseSourceSchema = ReleaseSourceSchema.ReleasePlanner,
 ) {
     val isPowerPlatform: Boolean
         get() = type.normalizedType() == "powerplatform"
+}
+
+enum class ReleaseSourceSchema {
+    ReleasePlanner,
+    M365,
+    ;
+
+    companion object {
+        fun fromConfig(value: String): ReleaseSourceSchema {
+            return when (value.normalizedType()) {
+                "", "releaseplanner" -> ReleasePlanner
+                "m365", "m365planner", "microsoft365" -> M365
+                else -> error("Unsupported release source schema: $value")
+            }
+        }
+    }
 }
 
 object DefaultReleaseSources {
@@ -28,7 +45,57 @@ object DefaultReleaseSources {
             product = "Copilot Studio",
             version = "2026-06",
             type = "PowerPlatform",
-            url = "https://releaseplans.microsoft.com/en-US/releaseplanner-json/?productId=1019ec3d-1dc5-e911-a969-000d3a4f36ce&langCode=en-us",
+            url = "https://www.microsoft.com/releasecommunications/api/v2/m365?\$count=true&includeFacets=false&top=500&skip=0&filter=products/any(f:f%20eq%20%27Microsoft%20Copilot%20Studio%27)&orderby=generalAvailabilityDate%20desc",
+            schema = ReleaseSourceSchema.M365,
+        ),
+        ReleaseSource(
+            product = "Microsoft 365 admin center",
+            version = "M365",
+            type = "M365",
+            url = "https://www.microsoft.com/releasecommunications/api/v2/m365?\$count=true&includeFacets=true&top=500&skip=0&filter=products/any(f:f%20eq%20%27Microsoft%20365%20admin%20center%27)&orderby=generalAvailabilityDate%20desc",
+            schema = ReleaseSourceSchema.M365,
+        ),
+        ReleaseSource(
+            product = "PowerAutomate(M365)",
+            version = "M365",
+            type = "M365",
+            url = "https://www.microsoft.com/releasecommunications/api/v2/m365?\$count=true&includeFacets=true&top=500&skip=0&filter=products/any(f:f%20eq%20%27Power%20Automate%27)&orderby=generalAvailabilityDate%20desc",
+            schema = ReleaseSourceSchema.M365,
+        ),
+        ReleaseSource(
+            product = "SharePoint",
+            version = "M365",
+            type = "M365",
+            url = "https://www.microsoft.com/releasecommunications/api/v2/m365?\$count=true&includeFacets=true&top=500&skip=0&filter=products/any(f:f%20eq%20%27SharePoint%27)&orderby=generalAvailabilityDate%20desc",
+            schema = ReleaseSourceSchema.M365,
+        ),
+        ReleaseSource(
+            product = "Microsoft Agent 365",
+            version = "M365",
+            type = "M365",
+            url = "https://www.microsoft.com/releasecommunications/api/v2/m365?\$count=true&includeFacets=true&top=500&skip=0&filter=products/any(f:f%20eq%20%27Microsoft%20Agent%20365%27)&orderby=generalAvailabilityDate%20desc",
+            schema = ReleaseSourceSchema.M365,
+        ),
+        ReleaseSource(
+            product = "Microsoft Copilot (Microsoft 365)",
+            version = "M365",
+            type = "M365",
+            url = "https://www.microsoft.com/releasecommunications/api/v2/m365?\$count=true&includeFacets=true&top=50&skip=0&filter=products/any(f:f%20eq%20%27Microsoft%20Copilot%20(Microsoft%20365)%27)&orderby=generalAvailabilityDate%20desc",
+            schema = ReleaseSourceSchema.M365,
+        ),
+        ReleaseSource(
+            product = "Microsoft Purview",
+            version = "M365",
+            type = "M365",
+            url = "https://www.microsoft.com/releasecommunications/api/v2/m365?\$count=true&includeFacets=true&top=500&skip=0&filter=products/any(f:f%20eq%20%27Microsoft%20Purview%27)&orderby=generalAvailabilityDate%20desc",
+            schema = ReleaseSourceSchema.M365,
+        ),
+        ReleaseSource(
+            product = "Excel",
+            version = "M365",
+            type = "M365",
+            url = "https://www.microsoft.com/releasecommunications/api/v2/m365?\$count=true&includeFacets=true&top=500&skip=0&filter=products/any(f:f%20eq%20%27Excel%27)&orderby=generalAvailabilityDate%20desc",
+            schema = ReleaseSourceSchema.M365,
         ),
         ReleaseSource(
             product = "AI Builder",

@@ -1,24 +1,16 @@
 package com.releaseplanner.tracker.ui
 
 import android.text.Html
+import com.releaseplanner.tracker.data.ReleaseDateRange
+import com.releaseplanner.tracker.data.parseReleaseDateRange
 import com.releaseplanner.tracker.data.local.ReleaseUpdateEntity
 import java.time.Instant
 import java.time.LocalDate
-import java.time.YearMonth
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
-import java.time.format.DateTimeParseException
 import java.util.Locale
 
 private val displayFormat = DateTimeFormatter.ofPattern("MMM d yyyy", Locale.US)
-private val rawDateFormats = listOf(
-    DateTimeFormatter.ofPattern("M/d/yyyy", Locale.US),
-    DateTimeFormatter.ofPattern("MM/dd/yyyy", Locale.US),
-    DateTimeFormatter.ofPattern("MMM d, yyyy", Locale.US),
-    DateTimeFormatter.ofPattern("MMM d yyyy", Locale.US),
-    DateTimeFormatter.ofPattern("MMMM d, yyyy", Locale.US),
-    DateTimeFormatter.ofPattern("MMMM d yyyy", Locale.US),
-)
 private val monthYearFormat = DateTimeFormatter.ofPattern("MMM yyyy", Locale.US)
 
 fun String.htmlToText(): String {
@@ -47,23 +39,28 @@ fun ReleaseUpdateEntity.gaDateLabel(): String {
 }
 
 fun ReleaseUpdateEntity.releaseDate(): LocalDate? {
-    return parseReleaseDate(gaDateValue)
-        ?: parseReleaseDate(gaDate)
-        ?: parseReleaseDate(ppDateValue)
-        ?: parseReleaseDate(publicPreviewDate)
+    return releaseDateRange()?.start
+}
+
+fun ReleaseUpdateEntity.releaseDateRange(): ReleaseDateRange? {
+    return firstReleaseDateRange(gaDateValue, gaDate, ppDateValue, publicPreviewDate)
 }
 
 fun ReleaseUpdateEntity.timelineDate(sort: TimelineSortOption): LocalDate? {
+    return timelineDateRange(sort)?.start
+}
+
+fun ReleaseUpdateEntity.timelineDateRange(sort: TimelineSortOption): ReleaseDateRange? {
     return when (sort) {
-        TimelineSortOption.LastUpdate -> parseReleaseDate(gitCommitDate)
-        TimelineSortOption.EarlyAccess -> parseReleaseDate(eaDateValue) ?: parseReleaseDate(earlyAccessDate)
-        TimelineSortOption.PublicPreview -> parseReleaseDate(ppDateValue) ?: parseReleaseDate(publicPreviewDate)
-        TimelineSortOption.GeneralAvailability -> parseReleaseDate(gaDateValue) ?: parseReleaseDate(gaDate)
+        TimelineSortOption.LastUpdate -> firstReleaseDateRange(gitCommitDate)
+        TimelineSortOption.EarlyAccess -> firstReleaseDateRange(eaDateValue, earlyAccessDate)
+        TimelineSortOption.PublicPreview -> firstReleaseDateRange(ppDateValue, publicPreviewDate)
+        TimelineSortOption.GeneralAvailability -> firstReleaseDateRange(gaDateValue, gaDate)
     }
 }
 
 fun ReleaseUpdateEntity.timelineDateLabel(sort: TimelineSortOption): String {
-    val dateLabel = timelineDate(sort)?.toDisplayDate()
+    val dateLabel = timelineDateRange(sort)?.toDisplayDate()
     return when (sort) {
         TimelineSortOption.LastUpdate -> "Last update: ${dateLabel ?: "Not announced"}"
         TimelineSortOption.EarlyAccess -> "Early access: ${dateLabel ?: "Not announced"}"
@@ -72,8 +69,8 @@ fun ReleaseUpdateEntity.timelineDateLabel(sort: TimelineSortOption): String {
     }
 }
 
-fun ReleaseUpdateEntity.isScheduledForToday(): Boolean {
-    return releaseDate() == LocalDate.now()
+fun ReleaseUpdateEntity.isScheduledForToday(today: LocalDate = LocalDate.now()): Boolean {
+    return releaseDateRange()?.contains(today) == true
 }
 
 fun ReleaseUpdateEntity.timelineMonthLabel(): String {
@@ -108,19 +105,15 @@ private fun String.takeMeaningful(): String? {
     return trimmed.takeIf { it.isNotEmpty() && it != "-" }
 }
 
-private fun String.toDisplayDate(): String? = parseReleaseDate(this)?.format(displayFormat)
+private fun String.toDisplayDate(): String? = parseReleaseDateRange(this)?.toDisplayDate()
 
-private fun parseReleaseDate(value: String): LocalDate? {
-    val meaningful = value.takeMeaningful() ?: return null
-    rawDateFormats.forEach { formatter ->
-        try {
-            return LocalDate.parse(meaningful, formatter)
-        } catch (_: DateTimeParseException) {
-        }
-    }
-    try {
-        return YearMonth.parse(meaningful, monthYearFormat).atDay(1)
-    } catch (_: DateTimeParseException) {
+private fun ReleaseDateRange.toDisplayDate(): String {
+    return start.format(if (isMonthOnly) monthYearFormat else displayFormat)
+}
+
+private fun firstReleaseDateRange(vararg values: String): ReleaseDateRange? {
+    values.forEach { value ->
+        parseReleaseDateRange(value)?.let { return it }
     }
     return null
 }

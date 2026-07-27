@@ -29,24 +29,25 @@ class ReleasePlannerClient(
     }
 
     suspend fun fetch(source: ReleaseSource): List<ReleaseItemDto> {
-        return fetchResponse(source).results
+        val rawBody = httpClient.get(source.url).bodyAsText().stripJsonPrefix()
+        return decodeItems(source, rawBody)
     }
 
     suspend fun debug(source: ReleaseSource): ReleaseApiDiagnostic {
         val response = httpClient.get(source.url)
         val rawBody = response.bodyAsText()
         val normalizedBody = rawBody.stripJsonPrefix()
-        return runCatching { json.decodeFromString<ReleasePlannerResponse>(normalizedBody) }
+        return runCatching { decodeItems(source, normalizedBody) }
             .fold(
-                onSuccess = { parsed ->
+                onSuccess = { items ->
                     ReleaseApiDiagnostic(
                         sourceProduct = source.product,
                         url = source.url,
                         statusCode = response.status.value,
                         contentType = response.headers[HttpHeaders.ContentType].orEmpty(),
                         bodyLength = rawBody.length,
-                        parsedCount = parsed.results.size,
-                        firstFeature = parsed.results.firstOrNull()?.featureName.orEmpty(),
+                        parsedCount = items.size,
+                        firstFeature = items.firstOrNull()?.featureName.orEmpty(),
                         responsePreview = normalizedBody.take(1_500),
                     )
                 },
@@ -66,9 +67,14 @@ class ReleasePlannerClient(
             )
     }
 
-    private suspend fun fetchResponse(source: ReleaseSource): ReleasePlannerResponse {
-        val rawBody = httpClient.get(source.url).bodyAsText().stripJsonPrefix()
-        return json.decodeFromString<ReleasePlannerResponse>(rawBody)
+    private fun decodeItems(source: ReleaseSource, rawBody: String): List<ReleaseItemDto> {
+        return when (source.schema) {
+            ReleaseSourceSchema.ReleasePlanner ->
+                json.decodeFromString<ReleasePlannerResponse>(rawBody).results
+
+            ReleaseSourceSchema.M365 ->
+                json.decodeFromString<M365PlannerResponse>(rawBody).value.map { it.toReleaseItemDto(source) }
+        }
     }
 }
 

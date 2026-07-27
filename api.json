@@ -3,42 +3,98 @@
         "Product": "PowerApps",
         "Version": "2026-06",
         "Type":"PowerPlatform",
+        "Schema": "ReleasePlanner",
         "Url": "https://releaseplans.microsoft.com/en-US/releaseplanner-json/?productId=e72f17ac-715d-e911-a968-000d3a4e32b5&langCode=en-us"
     },
     {
         "Product": "PowerAutomate",
         "Version": "2026-06",
         "Type":"PowerPlatform",
+        "Schema": "ReleasePlanner",
         "Url": "https://releaseplans.microsoft.com/en-US/releaseplanner-json/?productId=e92f17ac-715d-e911-a968-000d3a4e32b5&langCode=en-us"
+    },
+    {
+        "Product": "PowerAutomate(M365)",
+        "Version": "M365",
+        "Type": "PowerPlatform",
+        "Schema": "M365",
+        "Url": "https://www.microsoft.com/releasecommunications/api/v2/m365?$count=true&includeFacets=true&top=500&skip=0&filter=products/any(f:f%20eq%20%27Power%20Automate%27)&orderby=generalAvailabilityDate%20desc"
     },
     {
         "Product": "CopilotStudio",
         "Version": "2026-06",
         "Type":"PowerPlatform",
-        "Url": "https://releaseplans.microsoft.com/en-US/releaseplanner-json/?productId=1019ec3d-1dc5-e911-a969-000d3a4f36ce&langCode=en-us"
+        "Schema": "M365",
+        "Url": "https://www.microsoft.com/releasecommunications/api/v2/m365?$count=true&includeFacets=false&top=500&skip=0&filter=products/any(f:f%20eq%20%27Microsoft%20Copilot%20Studio%27)&orderby=generalAvailabilityDate%20desc"
+    },
+    {
+        "Product": "Microsoft 365 admin center",
+        "Version": "M365",
+        "Type": "M365",
+        "Schema": "M365",
+        "Url": "https://www.microsoft.com/releasecommunications/api/v2/m365?$count=true&includeFacets=true&top=500&skip=0&filter=products/any(f:f%20eq%20%27Microsoft%20365%20admin%20center%27)&orderby=generalAvailabilityDate%20desc"
+    },
+    {
+        "Product": "SharePoint",
+        "Version": "M365",
+        "Type": "M365",
+        "Schema": "M365",
+        "Url": "https://www.microsoft.com/releasecommunications/api/v2/m365?$count=true&includeFacets=true&top=500&skip=0&filter=products/any(f:f%20eq%20%27SharePoint%27)&orderby=generalAvailabilityDate%20desc"
+    },
+    {
+        "Product": "Microsoft Agent 365",
+        "Version": "M365",
+        "Type": "M365",
+        "Schema": "M365",
+        "Url": "https://www.microsoft.com/releasecommunications/api/v2/m365?$count=true&includeFacets=true&top=500&skip=0&filter=products/any(f:f%20eq%20%27Microsoft%20Agent%20365%27)&orderby=generalAvailabilityDate%20desc"
+    },
+    {
+        "Product": "Microsoft Copilot (Microsoft 365)",
+        "Version": "M365",
+        "Type": "M365",
+        "Schema": "M365",
+        "Url": "https://www.microsoft.com/releasecommunications/api/v2/m365?$count=true&includeFacets=true&top=50&skip=0&filter=products/any(f:f%20eq%20%27Microsoft%20Copilot%20(Microsoft%20365)%27)&orderby=generalAvailabilityDate%20desc"
+    },
+    {
+        "Product": "Microsoft Purview",
+        "Version": "M365",
+        "Type": "M365",
+        "Schema": "M365",
+        "Url": "https://www.microsoft.com/releasecommunications/api/v2/m365?$count=true&includeFacets=true&top=500&skip=0&filter=products/any(f:f%20eq%20%27Microsoft%20Purview%27)&orderby=generalAvailabilityDate%20desc"
+    },
+    {
+        "Product": "Excel",
+        "Version": "M365",
+        "Type": "M365",
+        "Schema": "M365",
+        "Url": "https://www.microsoft.com/releasecommunications/api/v2/m365?$count=true&includeFacets=true&top=500&skip=0&filter=products/any(f:f%20eq%20%27Excel%27)&orderby=generalAvailabilityDate%20desc"
     },
     {
         "Product": "AiBuilder",
         "Version": "2026-06",
         "Type":"PowerPlatform",
+        "Schema": "ReleasePlanner",
         "Url": "https://releaseplans.microsoft.com/en-US/releaseplanner-json/?productId=eb2f17ac-715d-e911-a968-000d3a4e32b5&langCode=en-us"
     },
     {
         "Product": "Dataverse",
         "Version": "2026-06",
         "Type":"PowerPlatform",
+        "Schema": "ReleasePlanner",
         "Url": "https://releaseplans.microsoft.com/en-US/releaseplanner-json/?productId=a0e02858-50a4-ea11-a812-000d3a8faea9&langCode=en-us"
     },
     {
         "Product": "Platform",
         "Version": "2026-06",
         "Type":"PowerPlatform",
+        "Schema": "ReleasePlanner",
         "Url": "https://releaseplans.microsoft.com/en-US/releaseplanner-json/?productId=dbedfa94-1517-ea11-a811-000d3a8f010c&langCode=en-us"
     },
     {
         "Product": "PowerPages",
         "Version": "2026-06",
         "Type":"PowerPlatform",
+        "Schema": "ReleasePlanner",
         "Url": "https://releaseplans.microsoft.com/en-US/releaseplanner-json/?productId=1197f7de-0a44-ec11-8c62-00224829b77f&langCode=en-us"
     }
 ]
