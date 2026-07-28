@@ -1,0 +1,3 @@
+Month-only release dates now use the day each task was first synced, so tasks appear once on the appropriate day instead of every day of the month.
+
+Tasks first synced after their listed month use the final day of that month.

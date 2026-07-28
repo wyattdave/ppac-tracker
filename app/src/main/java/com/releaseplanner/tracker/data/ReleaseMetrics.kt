@@ -2,7 +2,9 @@ package com.releaseplanner.tracker.data
 
 import com.releaseplanner.tracker.data.local.ReleaseUpdateEntity
 import com.releaseplanner.tracker.data.local.UserTrackingEntity
+import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneId
 
 data class ReleaseSummaryMetrics(
     val totalOpen: Int = 0,
@@ -37,5 +39,7 @@ fun calculateReleaseSummaryMetrics(
 private fun ReleaseUpdateEntity.lastUpdateDate(): ReleaseDateRange? = parseReleaseDateRange(gitCommitDate)
 
 private fun ReleaseUpdateEntity.generalAvailabilityDate(): ReleaseDateRange? {
-    return parseReleaseDateRange(gaDateValue) ?: parseReleaseDateRange(gaDate)
+    val firstSeenDate = Instant.ofEpochMilli(firstSeenAt).atZone(ZoneId.systemDefault()).toLocalDate()
+    return parseReleaseDateRange(gaDateValue, firstSeenDate)
+        ?: parseReleaseDateRange(gaDate, firstSeenDate)
 }

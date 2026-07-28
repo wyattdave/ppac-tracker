@@ -31,7 +31,10 @@ private val exactDateFormats = listOf(
 )
 private val namedMonthYearFormat = DateTimeFormatter.ofPattern("MMM yyyy", Locale.US)
 
-fun parseReleaseDateRange(value: String): ReleaseDateRange? {
+fun parseReleaseDateRange(
+    value: String,
+    monthOnlyAnchor: LocalDate? = null,
+): ReleaseDateRange? {
     val meaningful = value.trim().takeIf { it.isNotEmpty() && it != "-" } ?: return null
 
     exactDateFormats.forEach { formatter ->
@@ -51,9 +54,12 @@ fun parseReleaseDateRange(value: String): ReleaseDateRange? {
             return null
         }
     }
-    return ReleaseDateRange(
-        start = month.atDay(1),
-        endInclusive = month.atEndOfMonth(),
-        isMonthOnly = true,
-    )
+    val monthStart = month.atDay(1)
+    val monthEnd = month.atEndOfMonth()
+    val effectiveDate = when {
+        monthOnlyAnchor == null || monthOnlyAnchor.isBefore(monthStart) -> monthStart
+        monthOnlyAnchor.isAfter(monthEnd) -> monthEnd
+        else -> monthOnlyAnchor
+    }
+    return ReleaseDateRange(effectiveDate, effectiveDate, isMonthOnly = true)
 }

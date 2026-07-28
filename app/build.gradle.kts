@@ -84,8 +84,8 @@ android {
         applicationId = "com.ppactracker.powerdevbox"
         minSdk = 26
         targetSdk = 37
-        versionCode = 9
-        versionName = "0.1.8"
+        versionCode = 10
+        versionName = "0.1.9"
     }
 
     buildFeatures {

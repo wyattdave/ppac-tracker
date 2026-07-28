@@ -43,7 +43,7 @@ fun ReleaseUpdateEntity.releaseDate(): LocalDate? {
 }
 
 fun ReleaseUpdateEntity.releaseDateRange(): ReleaseDateRange? {
-    return firstReleaseDateRange(gaDateValue, gaDate, ppDateValue, publicPreviewDate)
+    return firstReleaseDateRange(firstSeenDate(), gaDateValue, gaDate, ppDateValue, publicPreviewDate)
 }
 
 fun ReleaseUpdateEntity.timelineDate(sort: TimelineSortOption): LocalDate? {
@@ -52,10 +52,10 @@ fun ReleaseUpdateEntity.timelineDate(sort: TimelineSortOption): LocalDate? {
 
 fun ReleaseUpdateEntity.timelineDateRange(sort: TimelineSortOption): ReleaseDateRange? {
     return when (sort) {
-        TimelineSortOption.LastUpdate -> firstReleaseDateRange(gitCommitDate)
-        TimelineSortOption.EarlyAccess -> firstReleaseDateRange(eaDateValue, earlyAccessDate)
-        TimelineSortOption.PublicPreview -> firstReleaseDateRange(ppDateValue, publicPreviewDate)
-        TimelineSortOption.GeneralAvailability -> firstReleaseDateRange(gaDateValue, gaDate)
+        TimelineSortOption.LastUpdate -> firstReleaseDateRange(firstSeenDate(), gitCommitDate)
+        TimelineSortOption.EarlyAccess -> firstReleaseDateRange(firstSeenDate(), eaDateValue, earlyAccessDate)
+        TimelineSortOption.PublicPreview -> firstReleaseDateRange(firstSeenDate(), ppDateValue, publicPreviewDate)
+        TimelineSortOption.GeneralAvailability -> firstReleaseDateRange(firstSeenDate(), gaDateValue, gaDate)
     }
 }
 
@@ -111,9 +111,13 @@ private fun ReleaseDateRange.toDisplayDate(): String {
     return start.format(if (isMonthOnly) monthYearFormat else displayFormat)
 }
 
-private fun firstReleaseDateRange(vararg values: String): ReleaseDateRange? {
+private fun ReleaseUpdateEntity.firstSeenDate(): LocalDate {
+    return Instant.ofEpochMilli(firstSeenAt).atZone(ZoneId.systemDefault()).toLocalDate()
+}
+
+private fun firstReleaseDateRange(monthOnlyAnchor: LocalDate, vararg values: String): ReleaseDateRange? {
     values.forEach { value ->
-        parseReleaseDateRange(value)?.let { return it }
+        parseReleaseDateRange(value, monthOnlyAnchor)?.let { return it }
     }
     return null
 }
