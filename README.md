@@ -12,6 +12,18 @@ The app calls Microsoft's public release planner JSON endpoints directly, caches
 - Ktor client for public API calls
 - WorkManager for periodic background refresh
 - Android local notifications for new or changed updates
+- Vanilla HTML, CSS, and JavaScript for the Chrome extension and PWA ports
+
+## Web Ports
+
+Two phone-layout web ports live alongside the Android app:
+
+- [`chrome-ext/`](chrome-ext/) is a Manifest V3 Chrome side-panel extension. Load it unpacked from `chrome://extensions`. Its scheduled summary uses only the toolbar icon badge and tooltip—there are no popup/system notifications.
+- [`pwa/`](pwa/) is an installable, Android-oriented PWA. Serve it from HTTPS (or `localhost` during development), configure its feed proxy in Settings, and install it from Chrome. It does not expose or use notifications.
+
+Both ports retain browsing, search, product/status/stage filters, timeline sorting and date filtering, Complete/Skipped/Saved/Hidden tracking, sharing, email and docs links, product settings, light/dark themes, streaks, badges, reward debug controls, API diagnostics, deep links, and offline local caching. Browser storage replaces Room.
+
+The Microsoft feed hosts currently omit CORS headers, so a static PWA cannot refresh them directly. [`pwa/proxy/`](pwa/proxy/) contains a small allow-listed Cloudflare Worker for the two Microsoft hosts. This is the only material runtime dependency for PWA refresh; cached data and all local tracking remain available offline. See [`WEB_PORTS.md`](WEB_PORTS.md) for the full capability and setup notes.
 
 ## Build
 
