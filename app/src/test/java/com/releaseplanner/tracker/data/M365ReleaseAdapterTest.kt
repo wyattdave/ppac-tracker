@@ -58,7 +58,7 @@ class M365ReleaseAdapterTest {
         assertEquals("M365 Planner", item.featureCategory)
         assertEquals("https://learn.microsoft.com/example", item.docsUrl)
         assertEquals("", item.businessValue)
-        assertEquals("", item.featureDetails)
+        assertEquals("A description that has no legacy equivalent.", item.featureDetails)
         assertEquals(listOf("Worldwide (Standard Multi-Tenant)"), item.geos)
         assertTrue(item.aiContribution.toBoolean())
     }
@@ -106,7 +106,7 @@ class M365ReleaseAdapterTest {
         assertTrue(changedEntity.isChanged)
         assertTrue(firstEntity.contentHash != changedEntity.contentHash)
         assertEquals("", changedEntity.businessValue)
-        assertEquals("", changedEntity.featureDetails)
+        assertEquals("Changed description", changedEntity.featureDetails)
     }
 
     @Test

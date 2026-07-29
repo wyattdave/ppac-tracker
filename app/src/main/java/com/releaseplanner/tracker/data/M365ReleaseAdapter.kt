@@ -54,7 +54,7 @@ fun M365PlannerItemDto.toReleaseItemDto(source: ReleaseSource): ReleaseItemDto {
         featureType = releaseRings.orEmpty().joinToString(),
         featureCategory = "M365 Planner",
         businessValue = "",
-        featureDetails = "",
+        featureDetails = description.orEmpty(),
         aiContribution = (
             source.product.contains("copilot", ignoreCase = true) ||
                 products.orEmpty().any { it.contains("copilot", ignoreCase = true) }
