@@ -39,6 +39,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
 import androidx.compose.material3.AssistChip
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CenterAlignedTopAppBar
@@ -617,6 +618,34 @@ private fun SettingsScreen(
 ) {
     val context = LocalContext.current
     val uriHandler = LocalUriHandler.current
+    var bulkCompletion by remember { mutableStateOf<Boolean?>(null) }
+
+    bulkCompletion?.let { includePublicPreview ->
+        val count = if (includePublicPreview) state.previewCompletionCount else state.gaCompletionCount
+        val stage = if (includePublicPreview) "GA or public preview" else "GA"
+        AlertDialog(
+            onDismissRequest = { bulkCompletion = null },
+            title = { Text("Complete $stage tasks?") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("Mark $count cached task${if (count == 1) "" else "s"} already in $stage as complete, including hidden tasks and disabled products.")
+                    Text("This action cannot be undone.", fontWeight = FontWeight.Bold)
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = count > 0 && !state.isCompletingTasks && !state.isRefreshing,
+                    onClick = {
+                        bulkCompletion = null
+                        viewModel.completeReleasedTasks(includePublicPreview)
+                    },
+                ) { Text("Mark complete") }
+            },
+            dismissButton = {
+                TextButton(onClick = { bulkCompletion = null }) { Text("Cancel") }
+            },
+        )
+    }
 
     Column(
         modifier = Modifier
@@ -646,6 +675,22 @@ private fun SettingsScreen(
                 viewModel.setNotificationTime(hour, minute)
             },
         )
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text("Task completion", style = MaterialTheme.typography.titleMedium)
+            OutlinedButton(
+                modifier = Modifier.fillMaxWidth(),
+                enabled = state.gaCompletionCount > 0 && !state.isRefreshing && !state.isCompletingTasks,
+                onClick = { bulkCompletion = false },
+            ) { Text("Complete all GA tasks", textAlign = TextAlign.Center) }
+            OutlinedButton(
+                modifier = Modifier.fillMaxWidth(),
+                enabled = state.previewCompletionCount > 0 && !state.isRefreshing && !state.isCompletingTasks,
+                onClick = { bulkCompletion = true },
+            ) { Text("Complete all GA or public preview tasks", textAlign = TextAlign.Center) }
+        }
         ProductSettingsCard(
             settings = state.sourceSettings,
             onToggle = viewModel::setProductEnabled,

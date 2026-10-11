@@ -63,6 +63,27 @@ object DefaultReleaseSources {
             schema = ReleaseSourceSchema.M365,
         ),
         ReleaseSource(
+            product = "PowerApps(M365)",
+            version = "M365",
+            type = "M365",
+            url = "https://www.microsoft.com/releasecommunications/api/v2/m365?\$count=true&includeFacets=true&top=500&skip=0&filter=products/any(f:f%20eq%20%27Power%20Apps%27)&orderby=generalAvailabilityDate%20desc",
+            schema = ReleaseSourceSchema.M365,
+        ),
+        ReleaseSource(
+            product = "Dataverse(M365)",
+            version = "M365",
+            type = "M365",
+            url = "https://www.microsoft.com/releasecommunications/api/v2/m365?\$count=true&includeFacets=true&top=500&skip=0&filter=products/any(f:f%20eq%20%27Microsoft%20Dataverse%27)&orderby=generalAvailabilityDate%20desc",
+            schema = ReleaseSourceSchema.M365,
+        ),
+        ReleaseSource(
+            product = "Platform(M365)",
+            version = "M365",
+            type = "M365",
+            url = "https://www.microsoft.com/releasecommunications/api/v2/m365?\$count=true&includeFacets=true&top=500&skip=0&filter=products/any(f:f%20eq%20%27Microsoft%20Power%20Platform%20governance%20and%20administration%27)&orderby=generalAvailabilityDate%20desc",
+            schema = ReleaseSourceSchema.M365,
+        ),
+        ReleaseSource(
             product = "SharePoint",
             version = "M365",
             type = "M365",

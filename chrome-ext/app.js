@@ -6,6 +6,7 @@ import {
   addDays,
   bestDocsUrl,
   calculateMetrics,
+  completeReleasedTasks,
   diagnoseSource,
   displayDate,
   displayMonth,
@@ -20,6 +21,7 @@ import {
   primaryDateLabel,
   recordTaskRead,
   refreshState,
+  releasedTasksToComplete,
   releaseStatusLabel,
   setTaskStatus,
   sourceIsEnabled,
@@ -59,6 +61,7 @@ let busy = false;
 let debugEnabled = false;
 let aboutTapCount = 0;
 let achievement = null;
+let bulkCompletion = null;
 let installPrompt = null;
 let toastTimer = null;
 let pointerStart = null;
@@ -165,6 +168,27 @@ async function handleClick(event) {
     document.querySelector(`#${cssEscape(target.dataset.target)}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
   } else if (action === "set-status") {
     await changeStatus(target.dataset.id, target.dataset.status);
+  } else if (action === "bulk-complete" && !busy) {
+    const includePublicPreview = target.dataset.preview === "true";
+    if (!releasedTasksToComplete(state, includePublicPreview).length) return;
+    bulkCompletion = { includePublicPreview };
+    renderModal();
+  } else if (action === "cancel-bulk-complete") {
+    dismissBulkCompletion();
+  } else if (action === "confirm-bulk-complete" && bulkCompletion) {
+    const { includePublicPreview } = bulkCompletion;
+    const previousState = structuredClone(state);
+    bulkCompletion = null;
+    elements.modal.querySelectorAll("button").forEach((button) => { button.disabled = true; });
+    try {
+      let count = 0;
+      await mutateState(() => { count = completeReleasedTasks(state, includePublicPreview); }, true);
+      showToast(`${count} task${count === 1 ? "" : "s"} marked complete.`);
+    } catch {
+      state = previousState;
+      render();
+      showToast("Unable to save task completion. Please try again.");
+    }
   } else if (action === "toggle-saved") {
     await mutateState(() => toggleTrackingFlag(state, target.dataset.id, "isSaved"));
   } else if (action === "toggle-hidden") {
@@ -588,6 +612,8 @@ function renderTracked(items) {
 
 function renderSettings(items) {
   const enabledCount = items.filter((item) => !item.tracking.isHidden).length;
+  const gaCount = releasedTasksToComplete(state).length;
+  const previewCount = releasedTasksToComplete(state, true).length;
   return `
     <section class="screen flow settings-screen">
       <article class="card settings-card">
@@ -597,6 +623,11 @@ function renderSettings(items) {
         <button class="primary-button" type="button" data-action="refresh" ${busy ? "disabled" : ""}>${busy ? "Refreshing" : "Refresh now"}</button>
       </article>
       ${isExtension ? renderNotificationSettings() : renderPwaDataSettings()}
+      <section class="settings-card" aria-labelledby="task-completion-heading">
+        <h2 id="task-completion-heading">Task completion</h2>
+        <button class="outline-button" type="button" data-action="bulk-complete" data-preview="false" ${busy || !gaCount ? "disabled" : ""}>Complete all GA tasks</button>
+        <button class="outline-button" type="button" data-action="bulk-complete" data-preview="true" ${busy || !previewCount ? "disabled" : ""}>Complete all GA or public preview tasks</button>
+      </section>
       <article class="card settings-card">
         <h2>Products</h2>
         <div class="settings-list">
@@ -824,6 +855,31 @@ function badgeTile(badge) {
 }
 
 function renderModal() {
+  if (bulkCompletion) {
+    const { includePublicPreview } = bulkCompletion;
+    const count = releasedTasksToComplete(state, includePublicPreview).length;
+    const stage = includePublicPreview ? "GA or public preview" : "GA";
+    elements.shell.classList.remove("blurred");
+    elements.modal.hidden = false;
+    elements.modal.innerHTML = `
+      <dialog class="confirmation-dialog" role="alertdialog" aria-labelledby="bulk-completion-title" aria-describedby="bulk-completion-description bulk-completion-warning">
+        <h2 id="bulk-completion-title">Complete ${stage} tasks?</h2>
+        <p id="bulk-completion-description">Mark ${count} cached task${count === 1 ? "" : "s"} already in ${stage} as complete, including hidden tasks and disabled products.</p>
+        <p id="bulk-completion-warning"><strong>This action cannot be undone.</strong></p>
+        <div class="confirmation-actions">
+          <button class="outline-button" type="button" data-action="cancel-bulk-complete" autofocus>Cancel</button>
+          <button class="primary-button" type="button" data-action="confirm-bulk-complete" ${!count ? "disabled" : ""}>Mark complete</button>
+        </div>
+      </dialog>
+    `;
+    const dialog = elements.modal.querySelector("dialog");
+    dialog.addEventListener("cancel", (event) => {
+      event.preventDefault();
+      dismissBulkCompletion();
+    });
+    dialog.showModal();
+    return;
+  }
   if (!achievement) {
     elements.modal.innerHTML = "";
     elements.modal.hidden = true;
@@ -838,6 +894,13 @@ function renderModal() {
       <strong>You achieved ${escapeHtml(achievement.name)} for ${escapeHtml(achievement.description)}</strong>
     </button>
   `;
+}
+
+function dismissBulkCompletion() {
+  const includePublicPreview = bulkCompletion?.includePublicPreview;
+  bulkCompletion = null;
+  renderModal();
+  elements.content.querySelector(`[data-action="bulk-complete"][data-preview="${includePublicPreview}"]`)?.focus();
 }
 
 function openUpdate(id) {

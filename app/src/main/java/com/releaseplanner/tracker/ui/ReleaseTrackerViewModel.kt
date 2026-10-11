@@ -9,6 +9,7 @@ import com.releaseplanner.tracker.data.ReleaseRepository
 import com.releaseplanner.tracker.data.ReleaseThemeMode
 import com.releaseplanner.tracker.data.RewardDefinition
 import com.releaseplanner.tracker.data.RewardPerformance
+import com.releaseplanner.tracker.data.releasedTasksToComplete
 import com.releaseplanner.tracker.data.local.ChangeEventEntity
 import com.releaseplanner.tracker.data.local.ReleasePlannerDatabase
 import com.releaseplanner.tracker.data.local.ReleaseUpdateEntity
@@ -45,6 +46,7 @@ class ReleaseTrackerViewModel(application: Application) : AndroidViewModel(appli
     private val currentScreen = MutableStateFlow(AppScreen.Today)
     private val selectedUpdateId = MutableStateFlow<String?>(null)
     private val isRefreshing = MutableStateFlow(false)
+    private val isCompletingTasks = MutableStateFlow(false)
     private val isDebugLoading = MutableStateFlow(false)
     private val errorMessage = MutableStateFlow<String?>(null)
     private val apiDiagnostic = MutableStateFlow<com.releaseplanner.tracker.data.ReleaseApiDiagnostic?>(null)
@@ -99,8 +101,9 @@ class ReleaseTrackerViewModel(application: Application) : AndroidViewModel(appli
         isDebugLoading,
         errorMessage,
         apiDiagnostic,
-    ) { refreshing, debugLoading, error, diagnostic ->
-        ReleaseTrackerMeta(refreshing, debugLoading, error, diagnostic)
+        isCompletingTasks,
+    ) { refreshing, debugLoading, error, diagnostic, completing ->
+        ReleaseTrackerMeta(refreshing, debugLoading, error, diagnostic, completing)
     }
 
     private val dataState = combine(
@@ -189,6 +192,9 @@ class ReleaseTrackerViewModel(application: Application) : AndroidViewModel(appli
             rewardCompletedTaskCount = completedTaskCount,
             announcedRewardBadgeNames = preferenceState.rewardPerformance.announcedRewardBadges,
             isRefreshing = meta.isRefreshing,
+            isCompletingTasks = meta.isCompletingTasks,
+            gaCompletionCount = releasedTasksToComplete(data.updates, trackingByRelease).size,
+            previewCompletionCount = releasedTasksToComplete(data.updates, trackingByRelease, true).size,
             isDebugLoading = meta.isDebugLoading,
             errorMessage = meta.errorMessage,
             apiDiagnostic = meta.apiDiagnostic,
@@ -378,6 +384,21 @@ class ReleaseTrackerViewModel(application: Application) : AndroidViewModel(appli
             if (status == TaskStatus.Complete && !wasComplete) {
                 preferences.recordTaskCompleted()
             }
+        }
+    }
+
+    fun completeReleasedTasks(includePublicPreview: Boolean = false) {
+        if (isCompletingTasks.value || isRefreshing.value) return
+        isCompletingTasks.value = true
+        viewModelScope.launch {
+            errorMessage.value = null
+            runCatching { repository.completeReleasedTasks(includePublicPreview) }
+                .onSuccess { count ->
+                    if (count > 0) preferences.recordTaskCompleted()
+                    _messages.send("$count task${if (count == 1) "" else "s"} marked complete.")
+                }
+                .onFailure { errorMessage.value = "Unable to complete tasks: ${it.message ?: "Please try again."}" }
+            isCompletingTasks.value = false
         }
     }
 

@@ -82,6 +82,9 @@ data class ReleaseTrackerUiState(
     val rewardCompletedTaskCount: Int = 0,
     val announcedRewardBadgeNames: Set<String> = emptySet(),
     val isRefreshing: Boolean = false,
+    val isCompletingTasks: Boolean = false,
+    val gaCompletionCount: Int = 0,
+    val previewCompletionCount: Int = 0,
     val isDebugLoading: Boolean = false,
     val errorMessage: String? = null,
     val apiDiagnostic: ReleaseApiDiagnostic? = null,
@@ -125,6 +128,7 @@ data class ReleaseTrackerMeta(
     val isDebugLoading: Boolean,
     val errorMessage: String?,
     val apiDiagnostic: ReleaseApiDiagnostic?,
+    val isCompletingTasks: Boolean,
 )
 
 data class RewardProgressUi(

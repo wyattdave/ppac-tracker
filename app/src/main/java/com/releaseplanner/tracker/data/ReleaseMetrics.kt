@@ -12,6 +12,18 @@ data class ReleaseSummaryMetrics(
     val totalGaThisWeek: Int = 0,
 )
 
+fun releasedTasksToComplete(
+    updates: List<ReleaseUpdateEntity>,
+    trackingByReleaseId: Map<String, UserTrackingEntity>,
+    includePublicPreview: Boolean = false,
+): List<ReleaseUpdateEntity> {
+    return updates.filter { update ->
+        trackingByReleaseId[update.id]?.isComplete != true &&
+            (update.gaStatus.equals("Shipped", ignoreCase = true) ||
+                (includePublicPreview && update.ppStatus.equals("Shipped", ignoreCase = true)))
+    }
+}
+
 fun calculateReleaseSummaryMetrics(
     updates: List<ReleaseUpdateEntity>,
     trackingByReleaseId: Map<String, UserTrackingEntity> = emptyMap(),

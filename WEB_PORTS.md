@@ -12,6 +12,7 @@ The Chrome extension and PWA use identical `app.js`, `core.js`, and `styles.css`
 | Search and product/status/stage filters | Yes | Yes |
 | Timeline sort, date filter, and month scrubber | Yes | Yes |
 | Complete, Skip, Save, Hide/Restore | Yes, including touch swipe | Yes, including touch swipe |
+| Bulk complete cached GA or GA/public-preview tasks from Settings | Yes, with irreversible-action confirmation | Yes, with irreversible-action confirmation |
 | Share, email, docs links | Web Share/clipboard, `mailto:`, browser tab | Web Share/clipboard, `mailto:`, browser tab |
 | Product settings and light/dark theme | Yes | Yes |
 | Read/complete streaks and badges | Yes | Yes |

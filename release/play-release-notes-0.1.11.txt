@@ -1,0 +1,3 @@
+Added Microsoft 365 roadmap sources for Power Apps, Dataverse, and Power Platform governance and administration.
+
+New Settings actions let you mark all tasks already in GA, or GA and public preview, as complete. Each action shows a confirmation with the task count and warns that it cannot be undone.

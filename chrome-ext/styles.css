@@ -1074,6 +1074,39 @@ code {
   inset: 0;
 }
 
+.confirmation-dialog {
+  width: min(420px, calc(100% - 32px));
+  max-height: calc(100% - 32px);
+  padding: 24px;
+  border: 1px solid var(--outline);
+  border-radius: 8px;
+  background: var(--surface-raised);
+  color: var(--on-surface);
+  box-shadow: var(--shadow);
+}
+
+.confirmation-dialog::backdrop {
+  background: rgb(0 0 0 / 55%);
+}
+
+.confirmation-dialog h2 {
+  margin: 0 0 16px;
+  font-size: 1.1rem;
+}
+
+.confirmation-dialog p {
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.confirmation-actions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 20px;
+}
+
 .achievement-overlay {
   display: flex;
   align-items: center;

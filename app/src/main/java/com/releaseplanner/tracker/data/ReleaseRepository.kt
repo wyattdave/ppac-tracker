@@ -1,5 +1,6 @@
 package com.releaseplanner.tracker.data
 
+import androidx.room.withTransaction
 import com.releaseplanner.tracker.data.local.ChangeEventEntity
 import com.releaseplanner.tracker.data.local.ReleasePlannerDatabase
 import com.releaseplanner.tracker.data.local.ReleaseUpdateEntity
@@ -124,6 +125,21 @@ class ReleaseRepository(
 
     suspend fun clearSyncBadges() {
         database.releaseUpdateDao().clearSyncBadges()
+    }
+
+    suspend fun completeReleasedTasks(includePublicPreview: Boolean = false): Int = database.withTransaction {
+        val trackingByReleaseId = database.trackingDao().getAll().associateBy { it.releaseId }
+        val updates = releasedTasksToComplete(
+            updates = database.releaseUpdateDao().getAll(),
+            trackingByReleaseId = trackingByReleaseId,
+            includePublicPreview = includePublicPreview,
+        )
+        val now = System.currentTimeMillis()
+        updates.forEach { update ->
+            val tracking = trackingByReleaseId[update.id] ?: UserTrackingEntity(releaseId = update.id)
+            database.trackingDao().upsert(tracking.copy(isComplete = true, isSkipped = false, updatedAt = now))
+        }
+        updates.size
     }
 
     suspend fun updateTracking(

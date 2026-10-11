@@ -392,6 +392,18 @@ export function setTaskStatus(state, id, status) {
   updateLongestStreaks(state);
 }
 
+export function releasedTasksToComplete(state, includePublicPreview = false) {
+  return state.updates.filter((update) => !trackingFor(state, update.id).isComplete
+    && (matchesReleaseStage(update, "In GA")
+      || (includePublicPreview && matchesReleaseStage(update, "In Public Preview"))));
+}
+
+export function completeReleasedTasks(state, includePublicPreview = false) {
+  const updates = releasedTasksToComplete(state, includePublicPreview);
+  updates.forEach((update) => setTaskStatus(state, update.id, "Complete"));
+  return updates.length;
+}
+
 export function toggleTrackingFlag(state, id, flag) {
   const tracking = trackingFor(state, id);
   tracking[flag] = !tracking[flag];
