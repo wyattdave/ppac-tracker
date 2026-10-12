@@ -9,6 +9,9 @@ data class ReleaseSource(
 ) {
     val isPowerPlatform: Boolean
         get() = type.normalizedType() == "powerplatform"
+
+    val defaultEnabled: Boolean
+        get() = schema == ReleaseSourceSchema.M365
 }
 
 enum class ReleaseSourceSchema {
@@ -142,7 +145,20 @@ object DefaultReleaseSources {
             type = "PowerPlatform",
             url = "https://releaseplans.microsoft.com/en-US/releaseplanner-json/?productId=1197f7de-0a44-ec11-8c62-00224829b77f&langCode=en-us",
         ),
-    )
+    ).sortedByDescending { it.defaultEnabled }
 }
 
 fun String.normalizedType(): String = lowercase().filter { it.isLetterOrDigit() }
+
+fun String.releaseProductLabel(): String = when (this) {
+    "Platform" -> "Power Platform"
+    "Platform(M365)" -> "Power Platform (M365)"
+    else -> this
+}
+
+internal fun diagnosticSource(
+    sources: List<ReleaseSource>,
+    enabledSources: List<ReleaseSource>,
+): ReleaseSource = enabledSources.firstOrNull { it.schema == ReleaseSourceSchema.M365 }
+    ?: sources.firstOrNull { it.schema == ReleaseSourceSchema.M365 }
+    ?: error("No Microsoft 365 API source is configured")

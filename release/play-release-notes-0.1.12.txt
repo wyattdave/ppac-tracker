@@ -1,0 +1,7 @@
+M365 products now appear first and are enabled by default. Legacy feeds are off by default; saved product selections are preserved.
+
+Renamed Platform to Power Platform, removed default on/off labels, and added a November deprecation notice for non-M365 sources.
+
+API diagnostics now use M365. Updates has a Complete filter.
+
+Refresh is faster with parallel requests and fewer cache queries. Slow feeds time out instead of leaving refresh running indefinitely.

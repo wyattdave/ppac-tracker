@@ -20,6 +20,32 @@ class M365ReleaseAdapterTest {
     )
 
     @Test
+    fun `M365 sources are first and enabled by default regardless of product type`() {
+        assertTrue(source.defaultEnabled)
+        assertTrue(!source.copy(schema = ReleaseSourceSchema.ReleasePlanner).defaultEnabled)
+        val sources = DefaultReleaseSources.all
+        assertTrue(sources.takeWhile { it.defaultEnabled }.isNotEmpty())
+        assertTrue(sources.dropWhile { it.defaultEnabled }.none { it.defaultEnabled })
+        assertTrue(sources.filter { it.defaultEnabled }.all { it.schema == ReleaseSourceSchema.M365 })
+    }
+
+    @Test
+    fun `diagnostic always selects M365 even when only legacy sources are enabled`() {
+        val legacy = source.copy(schema = ReleaseSourceSchema.ReleasePlanner)
+        assertEquals(source, diagnosticSource(listOf(legacy, source), listOf(legacy)))
+        assertEquals(source, diagnosticSource(listOf(legacy, source), emptyList()))
+        val enabledM365 = source.copy(product = "PowerApps(M365)")
+        assertEquals(enabledM365, diagnosticSource(listOf(legacy, source, enabledM365), listOf(enabledM365)))
+    }
+
+    @Test
+    fun `Power Platform labels do not change source identity`() {
+        assertEquals("Power Platform", "Platform".releaseProductLabel())
+        assertEquals("Power Platform (M365)", "Platform(M365)".releaseProductLabel())
+        assertEquals("Copilot Studio", "Copilot Studio".releaseProductLabel())
+    }
+
+    @Test
     fun `maps M365 fields into the existing release schema`() {
         val response = json.decodeFromString<M365PlannerResponse>(
             """

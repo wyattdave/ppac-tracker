@@ -1,6 +1,7 @@
 package com.releaseplanner.tracker.data
 
 import com.releaseplanner.tracker.data.local.UserTrackingEntity
+import com.releaseplanner.tracker.ui.ReleaseUpdateUi
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -21,6 +22,21 @@ class ReleaseMetricsTest {
         "skipped" to UserTrackingEntity(releaseId = "skipped", isSkipped = true),
         "completed" to UserTrackingEntity(releaseId = "completed", isComplete = true),
     )
+
+    @Test
+    fun `Complete filter shows only completed tasks and leaves Open and Skipped distinct`() {
+        val items = releases.map { update ->
+            ReleaseUpdateUi(update, tracking[update.id] ?: UserTrackingEntity(releaseId = update.id))
+        }.filterNot { it.isHidden }
+
+        assertEquals(listOf("completed"), items.filter { it.matchesStatus("Complete") }.map { it.update.id })
+        assertEquals(listOf("skipped"), items.filter { it.matchesStatus("Skipped") }.map { it.update.id })
+        assertEquals(
+            listOf("ga", "preview", "early", "planned", "disabled"),
+            items.filter { it.matchesStatus("Open") }.map { it.update.id },
+        )
+        assertEquals(items, items.filter { it.matchesStatus("All") })
+    }
 
     @Test
     fun `GA completion considers all cached shipped tasks regardless of visibility`() {

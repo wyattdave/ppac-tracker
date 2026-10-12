@@ -2,7 +2,9 @@ package com.releaseplanner.tracker.data
 
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.android.Android
+import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.client.plugins.expectSuccess
 import io.ktor.client.request.get
 import io.ktor.client.statement.bodyAsText
 import io.ktor.serialization.kotlinx.json.json
@@ -11,6 +13,12 @@ import kotlinx.serialization.json.Json
 
 class ReleasePlannerClient(
     private val httpClient: HttpClient = HttpClient(Android) {
+        expectSuccess = true
+        install(HttpTimeout) {
+            requestTimeoutMillis = 30_000
+            connectTimeoutMillis = 10_000
+            socketTimeoutMillis = 20_000
+        }
         install(ContentNegotiation) {
             json(
                 Json {
@@ -34,7 +42,9 @@ class ReleasePlannerClient(
     }
 
     suspend fun debug(source: ReleaseSource): ReleaseApiDiagnostic {
-        val response = httpClient.get(source.url)
+        val response = httpClient.get(source.url) {
+            expectSuccess = false
+        }
         val rawBody = response.bodyAsText()
         val normalizedBody = rawBody.stripJsonPrefix()
         return runCatching { decodeItems(source, normalizedBody) }

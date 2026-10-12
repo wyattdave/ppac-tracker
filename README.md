@@ -52,9 +52,11 @@ If Android Studio is not compatible with your Windows ARM machine, use VS Code l
 
 The workflow is defined in `.github/workflows/android-build.yml` and builds `:app:assembleDebug` on an Ubuntu runner with JDK 17 and the Android SDK.
 
-## Release Build Later
+## Play Store Release
 
-For Play Store distribution, add a separate signed `.aab` workflow later. That workflow should use GitHub Actions secrets for the keystore, key alias, and passwords, then run `./gradlew :app:bundleRelease` and upload the signed app bundle artifact.
+Release signing reads `release.storeFile`, `release.storePassword`, `release.keyAlias`, and `release.keyPassword` from local properties, Gradle properties, or their corresponding `RELEASE_*` environment variables. Keep signing credentials out of source control.
+
+Run `./gradlew.bat :app:testDebugUnitTest :app:lintRelease :app:bundleRelease` on Windows to validate and build the signed bundle. Versioned upload bundles, Play release notes, and SHA-256 checksums are kept in [`release/`](release/).
 
 ## Data Source
 
@@ -64,6 +66,8 @@ The release sources are defined in `api.json` and bundled in the app. Each sourc
 - `M365` for the release communications `value` response.
 
 Sources using either schema are adapted into the same local release model. M365 month-only dates are treated as covering the full month for date and week filters.
+M365 sources appear first in Products and are enabled by default; legacy sources default to off. Explicit product selections are preserved. Settings includes a notice that non-M365 sources will be deprecated in November. Platform is displayed as Power Platform without changing stored source identities.
+API diagnostics always use an M365 source. Refresh fetches up to four sources concurrently with a 30-second limit per feed, uses one cache snapshot for item matching, and retains successful feeds when others fail. Updates includes a Complete status filter alongside Open and Skipped.
 Rewards are based on `rewards.json`, which is bundled alongside the release source config. Product settings, task tracking, and streak progress are stored locally and included in Android backup/device transfer.
 
 ## Current Scope

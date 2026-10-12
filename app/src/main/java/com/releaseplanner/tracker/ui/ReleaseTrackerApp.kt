@@ -95,6 +95,7 @@ import com.releaseplanner.tracker.R
 import com.releaseplanner.tracker.data.NotificationSettings
 import com.releaseplanner.tracker.data.ReleaseSourceSetting
 import com.releaseplanner.tracker.data.ReleaseThemeMode
+import com.releaseplanner.tracker.data.releaseProductLabel
 import com.releaseplanner.tracker.data.local.ReleaseUpdateEntity
 import com.releaseplanner.tracker.sync.ReleaseSyncScheduler
 import kotlinx.coroutines.launch
@@ -107,6 +108,7 @@ import java.util.Locale
 
 private val statusFilters = listOf(
     "Open",
+    "Complete",
     "All",
     "New",
     "Changed",
@@ -657,7 +659,7 @@ private fun SettingsScreen(
         ElevatedCard(modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("Data source", style = MaterialTheme.typography.titleMedium)
-                Text("Microsoft public release planner API", style = MaterialTheme.typography.bodyMedium)
+                Text("Microsoft public M365 and Power Platform APIs", style = MaterialTheme.typography.bodyMedium)
                 Text("${state.visibleUpdates.size} cached updates", style = MaterialTheme.typography.bodySmall)
                 Button(onClick = viewModel::refresh, enabled = !state.isRefreshing) {
                     Text(if (state.isRefreshing) "Refreshing" else "Refresh now")
@@ -702,12 +704,12 @@ private fun SettingsScreen(
         ElevatedCard(modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("API diagnostic", style = MaterialTheme.typography.titleMedium)
-                Text("Fetches the first public Microsoft source and shows the raw parse result.")
+                Text("Microsoft 365 release communications API", style = MaterialTheme.typography.bodyMedium)
                 Button(onClick = viewModel::runApiDiagnostic, enabled = !state.isDebugLoading) {
                     Text(if (state.isDebugLoading) "Checking" else "Run API diagnostic")
                 }
                 state.apiDiagnostic?.let { diagnostic ->
-                    DetailLine("Source", diagnostic.sourceProduct)
+                    DetailLine("Source", diagnostic.sourceProduct.releaseProductLabel())
                     DetailLine("HTTP status", diagnostic.statusCode.toString())
                     DetailLine("Content type", diagnostic.contentType.ifBlank { "Not provided" })
                     DetailLine("Body length", diagnostic.bodyLength.toString())
@@ -1372,9 +1374,9 @@ private fun ProductSettingsCard(
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        Text(setting.product, style = MaterialTheme.typography.bodyLarge)
+                        Text(setting.product.releaseProductLabel(), style = MaterialTheme.typography.bodyLarge)
                         Text(
-                            text = setting.type.ifBlank { "No type" } + if (setting.defaultEnabled) " default on" else " default off",
+                            text = setting.type.ifBlank { "No type" },
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -1385,6 +1387,11 @@ private fun ProductSettingsCard(
                     )
                 }
             }
+            Text(
+                text = "Non-M365 sources will be deprecated in November.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }
@@ -1428,7 +1435,7 @@ private fun ReleaseUpdateRow(item: ReleaseUpdateUi, onClick: () -> Unit) {
                 }
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = item.update.product,
+                    text = item.update.product.releaseProductLabel(),
                     modifier = Modifier.weight(1f),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.primary,
@@ -1485,7 +1492,7 @@ private fun TimelineRow(item: ReleaseUpdateUi, sort: TimelineSortOption, onClick
         Column(modifier = Modifier.weight(1f)) {
             Text(item.update.timelineDateLabel(sort), style = MaterialTheme.typography.labelMedium)
             Text(item.update.featureName, style = MaterialTheme.typography.bodyLarge, maxLines = 2, overflow = TextOverflow.Ellipsis)
-            Text(item.update.product, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+            Text(item.update.product.releaseProductLabel(), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
         }
     }
 }
@@ -1514,7 +1521,7 @@ private fun UpdateDetailSection(
                 .padding(18.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Text(item.update.product, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelLarge)
+            Text(item.update.product.releaseProductLabel(), color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelLarge)
             Text(item.update.featureName, style = MaterialTheme.typography.headlineSmall)
             Row(
                 modifier = Modifier.horizontalScroll(rememberScrollState()),
@@ -1737,7 +1744,7 @@ private fun ProductFilterRow(products: List<String>, selected: String, onSelecte
             FilterChip(
                 selected = selected == product,
                 onClick = { onSelected(product) },
-                label = { Text(product) },
+                label = { Text(product.releaseProductLabel()) },
             )
         }
     }
@@ -1902,9 +1909,9 @@ private fun ReleaseUpdateEntity.bestDocsUrl(): String {
 private fun shareUpdate(context: Context, item: ReleaseUpdateUi) {
     val update = item.update
     val docsLink = update.bestDocsUrl().takeIf { it.isNotBlank() }
-    val subject = "${update.product}: ${update.featureName}"
+    val subject = "${update.product.releaseProductLabel()}: ${update.featureName}"
     val text = buildString {
-        appendLine("${update.product} release update:")
+        appendLine("${update.product.releaseProductLabel()} release update:")
         appendLine(update.featureName)
         appendLine()
         appendLine("Status: ${update.statusLabel()}")
@@ -1924,7 +1931,7 @@ private fun emailUpdate(context: Context, item: ReleaseUpdateUi) {
     val update = item.update
     val appLink = AppDeepLinks.taskUri(update.id)
     val docsLink = update.bestDocsUrl().takeIf { it.isNotBlank() }
-    val subject = "${update.product}: ${update.featureName}"
+    val subject = "${update.product.releaseProductLabel()}: ${update.featureName}"
     val html = buildEmailHtml(update, appLink, docsLink)
     val intent = Intent(Intent.ACTION_SEND).apply {
         type = "message/rfc822"
@@ -1938,7 +1945,7 @@ private fun emailUpdate(context: Context, item: ReleaseUpdateUi) {
 private fun buildEmailHtml(update: ReleaseUpdateEntity, appLink: String, docsLink: String?): String {
     return buildString {
         append("<p><strong>")
-        append("${update.product} release update:".htmlEscaped())
+        append("${update.product.releaseProductLabel()} release update:".htmlEscaped())
         append("</strong><br>")
         append(update.featureName.htmlEscaped())
         append("</p>")

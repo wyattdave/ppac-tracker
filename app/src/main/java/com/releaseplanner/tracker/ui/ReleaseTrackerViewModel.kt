@@ -315,8 +315,9 @@ class ReleaseTrackerViewModel(application: Application) : AndroidViewModel(appli
     }
 
     fun refresh() {
+        if (isRefreshing.value) return
+        isRefreshing.value = true
         viewModelScope.launch {
-            isRefreshing.value = true
             errorMessage.value = null
             runCatching { repository.refresh() }
                 .onSuccess { result ->
@@ -471,21 +472,6 @@ class ReleaseTrackerViewModel(application: Application) : AndroidViewModel(appli
             "In Public Preview" -> update.isCurrentlyInPublicPreview()
             "In GA" -> update.isCurrentlyInGa()
             "GA this Week" -> update.isGaThisWeek()
-            else -> true
-        }
-    }
-
-    private fun ReleaseUpdateUi.matchesStatus(status: String): Boolean {
-        return when (status) {
-            "All" -> true
-            "Open" -> !isComplete && !isSkipped
-            "New" -> update.isReleasePlannerNew()
-            "Changed" -> update.isChanged
-            "Saved" -> isSaved
-            "Incomplete" -> !isComplete && !isSkipped
-            "Skipped" -> isSkipped
-            "AI" -> update.aiContribution
-            "Hidden" -> isHidden
             else -> true
         }
     }

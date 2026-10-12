@@ -5,6 +5,18 @@ import com.releaseplanner.tracker.data.local.ChangeEventEntity
 import com.releaseplanner.tracker.data.local.ReleasePlannerDatabase
 import com.releaseplanner.tracker.data.local.ReleaseUpdateEntity
 import com.releaseplanner.tracker.data.local.UserTrackingEntity
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.sync.withPermit
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
+import java.io.IOException
 import java.util.UUID
 
 class ReleaseRepository(
@@ -19,7 +31,7 @@ class ReleaseRepository(
 
     suspend fun isEmpty(): Boolean = database.releaseUpdateDao().count() == 0
 
-    suspend fun refresh(): SyncResult {
+    suspend fun refresh(): SyncResult = refreshMutex.withLock { withContext(Dispatchers.Default) {
         val now = System.currentTimeMillis()
         var total = 0
         var newCount = 0
@@ -29,12 +41,14 @@ class ReleaseRepository(
         val events = mutableListOf<ChangeEventEntity>()
 
         val activeSources = preferences?.enabledSources() ?: sources
+        val existingById = database.releaseUpdateDao().getAll().associateBy { it.id }.toMutableMap()
+        val fetchedSources = fetchReleaseSources(activeSources, client::fetch)
 
-        activeSources.forEach { source ->
-            runCatching { client.fetch(source) }
-                .onSuccess { items ->
+        fetchedSources.forEach { (source, fetchedItems) ->
+            runCatching {
+                    val items = fetchedItems.getOrThrow()
                     val sourceExisting = if (source.schema == ReleaseSourceSchema.M365) {
-                        database.releaseUpdateDao().getAll()
+                        existingById.values
                             .filter { it.sourceProduct == source.product }
                     } else {
                         emptyList()
@@ -49,19 +63,19 @@ class ReleaseRepository(
 
                     val updates = items.map { dto ->
                         val id = dto.stableId(source)
-                        val existingById = database.releaseUpdateDao().getById(id)
-                        val existingByProductId = if (existingById == null) {
+                        val existingByStableId = existingById[id]
+                        val existingByProductId = if (existingByStableId == null) {
                             m365ExistingByProductId[dto.productId]
                         } else {
                             null
                         }
-                        val existingByLegacyTitle = if (existingById == null && existingByProductId == null) {
+                        val existingByLegacyTitle = if (existingByStableId == null && existingByProductId == null) {
                             legacyExistingByTitle[dto.featureName.normalizedReleaseTitle()]
                                 ?.removeFirstOrNull()
                         } else {
                             null
                         }
-                        val existing = existingById ?: existingByProductId ?: existingByLegacyTitle
+                        val existing = existingByStableId ?: existingByProductId ?: existingByLegacyTitle
                         val entity = dto.toEntity(source, existing, now)
                         val isNewlyDetected = existing == null
                         val isChangedNow = existing != null && existing.contentHash != entity.contentHash
@@ -79,9 +93,11 @@ class ReleaseRepository(
                         entity
                     }
                     database.releaseUpdateDao().upsertAll(updates)
+                    updates.forEach { existingById[it.id] = it }
                     total += updates.size
                 }
                 .onFailure { error ->
+                    if (error is CancellationException) throw error
                     failedSources += source.product
                     failureMessages += "${source.product}: ${error.message ?: error::class.simpleName.orEmpty()}"
                 }
@@ -95,7 +111,7 @@ class ReleaseRepository(
             preferences?.recordApiFailure()
         }
 
-        return SyncResult(
+        SyncResult(
             total = total,
             newCount = newCount,
             changedCount = changedCount,
@@ -104,6 +120,10 @@ class ReleaseRepository(
             syncedAt = now,
             sourceCount = activeSources.size,
         )
+    } }
+
+    private companion object {
+        val refreshMutex = Mutex()
     }
 
     private fun ReleaseUpdateEntity.isM365Adapted(): Boolean {
@@ -112,7 +132,7 @@ class ReleaseRepository(
     }
 
     suspend fun debugFirstSource(): ReleaseApiDiagnostic {
-        return client.debug((preferences?.enabledSources() ?: sources).firstOrNull() ?: sources.first())
+        return client.debug(diagnosticSource(sources, preferences?.enabledSources() ?: sources))
     }
 
     suspend fun summaryMetrics(): ReleaseSummaryMetrics {
@@ -175,4 +195,25 @@ data class SyncResult(
     val sourceCount: Int,
 ) {
     val hasChanges: Boolean = newCount > 0 || changedCount > 0
+}
+
+internal suspend fun fetchReleaseSources(
+    sources: List<ReleaseSource>,
+    fetch: suspend (ReleaseSource) -> List<ReleaseItemDto>,
+    timeoutMillis: Long = 30_000,
+): List<Pair<ReleaseSource, Result<List<ReleaseItemDto>>>> = coroutineScope {
+    val semaphore = Semaphore(4)
+    sources.map { source ->
+        async {
+            semaphore.withPermit {
+                val result = runCatching {
+                    withTimeoutOrNull(timeoutMillis) { fetch(source) }
+                        ?: throw IOException("Request timed out after ${timeoutMillis / 1_000} seconds")
+                }.onFailure { error ->
+                    if (error is CancellationException) throw error
+                }
+                source to result
+            }
+        }
+    }.awaitAll()
 }

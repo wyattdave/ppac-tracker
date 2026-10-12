@@ -27,7 +27,7 @@ class ReleasePreferences(
     }
 
     fun isProductEnabled(source: ReleaseSource): Boolean {
-        return prefs.getBoolean(productEnabledKey(source.product), source.isPowerPlatform)
+        return prefs.getBoolean(productEnabledKey(source.product), source.defaultEnabled)
     }
 
     fun setProductEnabled(product: String, enabled: Boolean) {
@@ -149,13 +149,17 @@ class ReleasePreferences(
     }
 
     private fun readSourceSettings(): List<ReleaseSourceSetting> {
-        return sources.map { source ->
+        return sources.sortedByDescending { it.defaultEnabled }.map { source ->
             ReleaseSourceSetting(
                 product = source.product,
-                type = source.type,
+                type = when {
+                    source.schema == ReleaseSourceSchema.M365 -> "M365"
+                    source.isPowerPlatform -> "Power Platform"
+                    else -> source.type
+                },
                 version = source.version,
                 enabled = isProductEnabled(source),
-                defaultEnabled = source.isPowerPlatform,
+                defaultEnabled = source.defaultEnabled,
             )
         }
     }

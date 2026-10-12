@@ -17,6 +17,7 @@ object ReleaseConfigLoader {
         return runCatching {
             decodeAsset<List<ReleaseSourceConfig>>(context, "api.json")
                 .mapNotNull { it.toReleaseSource() }
+                .sortedByDescending { it.defaultEnabled }
                 .ifEmpty { DefaultReleaseSources.all }
         }.getOrDefault(DefaultReleaseSources.all)
     }

@@ -42,6 +42,21 @@ data class ReleaseUpdateUi(
     val isSkipped: Boolean get() = tracking.isSkipped
     val isSaved: Boolean get() = tracking.isSaved
     val isHidden: Boolean get() = tracking.isHidden
+    fun matchesStatus(status: String): Boolean {
+        return when (status) {
+            "All" -> true
+            "Open", "Incomplete" -> !isComplete && !isSkipped
+            "Complete" -> isComplete
+            "New" -> update.isReleasePlannerNew()
+            "Changed" -> update.isChanged
+            "Saved" -> isSaved
+            "Skipped" -> isSkipped
+            "AI" -> update.aiContribution
+            "Hidden" -> isHidden
+            else -> true
+        }
+    }
+
     val taskStatus: TaskStatus
         get() = when {
             isComplete -> TaskStatus.Complete
